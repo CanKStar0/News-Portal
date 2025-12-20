@@ -1,0 +1,27 @@
+# Node.js bağımlılıkları
+node_modules/
+
+# Ortam değişkenleri (gizli bilgiler içerir)
+.env
+
+# Log dosyaları
+logs/
+*.log
+npm-debug.log*
+
+# IDE dosyaları
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS dosyaları
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Build çıktıları
+dist/
+build/
