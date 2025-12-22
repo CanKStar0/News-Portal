@@ -1,6 +1,6 @@
 # 📰 Haber Scraper - Web Kazıma Projesi
 
-Node.js tabanlı haber scraping sistemi. Türkiye'deki finans ve ekonomi haber sitelerinden otomatik haber toplama, depolama ve API ile sunma.
+Node.js tabanlı haber scraping sistemi. Türkiye'deki 170'den fazla haber sitelerinden otomatik haber toplama, depolama ve API ile sunma.
 
 ## 🎯 Proje Amacı
 
