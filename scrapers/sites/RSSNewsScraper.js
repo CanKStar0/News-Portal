@@ -342,7 +342,13 @@ class RSSNewsScraper {
 
     async scrapeByCategory(category, keyword = null, limit = 50) {
         const allResults = [];
-        const categoryFeeds = Object.entries(this.rssFeeds).filter(([_, info]) => info.category === category);
+        // Case-insensitive kategori eşleştirme
+        const normalizedCat = category.toLowerCase();
+        const categoryFeeds = Object.entries(this.rssFeeds).filter(([_, info]) => 
+            info.category.toLowerCase() === normalizedCat
+        );
+        
+        console.log(`📂 ${category} kategorisinde ${categoryFeeds.length} feed bulundu`);
         
         for (let i = 0; i < categoryFeeds.length; i += 5) {
             const chunk = categoryFeeds.slice(i, i + 5);

@@ -80,8 +80,12 @@ class ScraperService {
             const RSSNewsScraper = require('../scrapers/sites/RSSNewsScraper');
             const rssScraper = new RSSNewsScraper();
             
-            // Tüm RSS kaynaklarından haber çek
-            const news = await rssScraper.scrapeAll();
+            // Tüm RSS kaynaklarından haber çek (scrapeAllStaggered kullanılıyor)
+            const news = await rssScraper.scrapeAllStaggered((progress) => {
+                if (progress.current % 10 === 0) {
+                    console.log(`📡 İlerleme: ${progress.current}/${progress.total} feed`);
+                }
+            });
 
             if (news.length > 0) {
                 // Sonuçları kaydet
