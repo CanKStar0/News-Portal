@@ -5,7 +5,11 @@
  */
 
 const helpers = require('./helpers');
+const { MemoryCache, searchCache, newsListCache } = require('./memoryCache');
 
 module.exports = {
-    ...helpers
+    ...helpers,
+    MemoryCache,
+    searchCache,
+    newsListCache
 };

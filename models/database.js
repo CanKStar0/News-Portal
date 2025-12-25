@@ -7,43 +7,63 @@
  * Mongoose kullanarak bağlantı açar, hata durumlarını yönetir
  * ve bağlantı olaylarını loglar.
  * 
- * MONGOOSE NEDİR?
- * Mongoose, MongoDB için bir ODM (Object Document Mapper) kütüphanesidir.
- * JavaScript objelerini MongoDB dökümanlarına dönüştürür ve tersini yapar.
- * Şema tanımlama, validasyon, middleware gibi özellikler sunar.
+ * BULUT VERİTABANI İÇİN OPTİMİZE EDİLMİŞTİR:
+ * - Otomatik yeniden bağlanma
+ * - Connection pooling
+ * - Sağlık kontrolü
  */
 
 const mongoose = require('mongoose');
 const config = require('../config');
 
+// Bağlantı durumu takibi
+let isConnected = false;
+let connectionRetries = 0;
+const MAX_RETRIES = 5;
+
 /**
  * MongoDB'ye bağlanma fonksiyonu
  * 
- * async/await AÇIKLAMASI:
- * - async: Bu fonksiyonun asenkron olduğunu belirtir
- * - await: Asenkron işlemin tamamlanmasını bekler
- * - Veritabanı bağlantısı zaman alan bir işlem olduğu için async kullanıyoruz
- * 
- * @returns {Promise<void>} - Bağlantı başarılı olursa resolve olur
- * @throws {Error} - Bağlantı başarısız olursa hata fırlatır
+ * BULUT İÇİN ÖNEMLİ:
+ * - Otomatik retry mekanizması
+ * - Exponential backoff
+ * - Detaylı hata loglaması
  */
 async function connectDatabase() {
+    if (isConnected) {
+        console.log('📦 MongoDB zaten bağlı');
+        return;
+    }
+    
     try {
-        // mongoose.connect() MongoDB'ye bağlantı kurar
-        // İlk parametre: Bağlantı URI'si (mongodb://host:port/database)
-        // İkinci parametre: Bağlantı seçenekleri (opsiyonel)
         await mongoose.connect(config.database.uri, config.database.options);
+        
+        isConnected = true;
+        connectionRetries = 0;
         
         console.log('✅ MongoDB bağlantısı başarılı!');
         console.log(`📍 Veritabanı: ${mongoose.connection.name}`);
         
+        // Bulut bağlantı bilgisi
+        const host = mongoose.connection.host;
+        if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+            console.log(`☁️  Bulut veritabanı: ${host}`);
+        }
+        
     } catch (error) {
-        // Bağlantı hatası durumunda detaylı hata mesajı
         console.error('❌ MongoDB bağlantı hatası:', error.message);
         
-        // process.exit(1): Uygulamayı hata koduyla sonlandırır
-        // Veritabanı olmadan uygulama çalışamayacağı için
-        // bağlantı hatasında uygulamayı durdurmak mantıklı
+        // Retry mekanizması
+        if (connectionRetries < MAX_RETRIES) {
+            connectionRetries++;
+            const delay = Math.min(1000 * Math.pow(2, connectionRetries), 30000); // Max 30 saniye
+            console.log(`🔄 Yeniden deneniyor (${connectionRetries}/${MAX_RETRIES}) - ${delay/1000}s sonra...`);
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return connectDatabase();
+        }
+        
+        console.error('💀 Maksimum yeniden deneme sayısına ulaşıldı. Uygulama kapatılıyor.');
         process.exit(1);
     }
 }
@@ -51,35 +71,47 @@ async function connectDatabase() {
 /**
  * MONGOOSE BAĞLANTI OLAYLARI (Events)
  * 
- * Mongoose, bağlantı durumu değişikliklerini event'ler ile bildirir.
- * Bu event'leri dinleyerek bağlantı sorunlarını takip edebiliriz.
+ * Bulut veritabanları için kritik - ağ sorunlarını takip eder
  */
 
 // Bağlantı kesildiğinde
 mongoose.connection.on('disconnected', () => {
     console.log('⚠️ MongoDB bağlantısı kesildi');
+    isConnected = false;
 });
 
 // Bağlantı yeniden kurulduğunda
 mongoose.connection.on('reconnected', () => {
     console.log('🔄 MongoDB bağlantısı yeniden kuruldu');
+    isConnected = true;
+    connectionRetries = 0;
 });
 
 // Hata oluştuğunda
 mongoose.connection.on('error', (err) => {
-    console.error('❌ MongoDB hatası:', err);
+    console.error('❌ MongoDB hatası:', err.message);
+    isConnected = false;
+});
+
+// Bağlantı açıldığında
+mongoose.connection.on('connected', () => {
+    isConnected = true;
 });
 
 /**
- * Graceful Shutdown - Düzgün Kapanış
+ * Bağlantı sağlık kontrolü
  * 
- * Uygulama kapanırken (Ctrl+C vs.) veritabanı bağlantısını
- * düzgün şekilde kapatmak önemlidir. Bu, veri kaybını önler
- * ve kaynakları serbest bırakır.
+ * @returns {boolean} - Bağlantı sağlıklı mı
+ */
+function isHealthy() {
+    return isConnected && mongoose.connection.readyState === 1;
+}
+
+/**
+ * Graceful Shutdown - Düzgün Kapanış
  */
 process.on('SIGINT', async () => {
     try {
-        // Tüm bağlantıları kapat
         await mongoose.connection.close();
         console.log('👋 MongoDB bağlantısı kapatıldı (uygulama kapanıyor)');
         process.exit(0);
@@ -89,8 +121,8 @@ process.on('SIGINT', async () => {
     }
 });
 
-// Fonksiyonu ve mongoose instance'ını dışa aktar
 module.exports = {
     connectDatabase,
-    mongoose
+    mongoose,
+    isHealthy
 };

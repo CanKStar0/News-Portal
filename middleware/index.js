@@ -11,12 +11,19 @@ const {
     formatValidationError 
 } = require('./errorHandler');
 const apiKey = require('./apiKey');
-const rateLimiter = require('./rateLimiter');
+const { apiLimiter, searchLimiter, scrapeLimiter, burstLimiter } = require('./rateLimiter');
+const security = require('./security');
 
 module.exports = {
     notFoundHandler,
     errorHandler,
     asyncHandler,
-    formatValidationError
-    , apiKey, rateLimiter
+    formatValidationError,
+    apiKey,
+    rateLimiter: apiLimiter,  // Backward compatibility
+    apiLimiter,
+    searchLimiter,
+    scrapeLimiter,
+    burstLimiter,
+    ...security
 };

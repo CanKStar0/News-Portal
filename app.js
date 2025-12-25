@@ -54,7 +54,7 @@ const path = require('path');
 const config = require('./config');
 const { connectDatabase } = require('./models');
 const { newsRoutes } = require('./routes');
-const { notFoundHandler, errorHandler, rateLimiter } = require('./middleware');
+const { notFoundHandler, errorHandler, rateLimiter, applySecurityMiddlewares } = require('./middleware');
 const { cronManager } = require('./jobs');
 
 // ====================================
@@ -100,6 +100,16 @@ app.use(helmet({
 }));
 
 /**
+ * Güvenlik Middleware'leri
+ * 
+ * NoSQL Injection, XSS ve şüpheli aktivite koruması.
+ * - Input sanitization ($ operatörlerini engeller)
+ * - Request ID (loglama için)
+ * - Şüpheli IP tespiti ve bloklama
+ */
+applySecurityMiddlewares(app);
+
+/**
  * CORS Middleware
  * 
  * Cross-Origin Resource Sharing - Farklı origin'lerden
@@ -110,10 +120,26 @@ app.use(helmet({
  * farklı bir domain'e istek yapamaz (Same-Origin Policy).
  * CORS bu kısıtlamayı esnetir.
  */
+
+// Production'da ALLOWED_ORIGINS env variable'ı kullan
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+    : ['*'];
+
 app.use(cors({
-    origin: '*',  // Tüm origin'lere izin ver (production'da kısıtla!)
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: config.server.isProduction 
+        ? (origin, callback) => {
+            // Origin yoksa (same-origin request) veya izin verilenler arasındaysa kabul et
+            if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error('CORS policy violation'));
+            }
+        }
+        : '*',  // Development'ta herkese izin ver
+    methods: ['GET', 'POST'],  // Sadece gerekli metodlara izin ver
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    credentials: true
 }));
 
 /**
@@ -130,9 +156,18 @@ app.use(express.json({ limit: '10mb' }));
  * URL-encoded Body Parser
  * 
  * Form verisini parse eder (application/x-www-form-urlencoded).
- * extended: true -> nested object'lere izin ver
+ * extended: false -> nested object'lere izin VERME (güvenlik için)
+ * Bu ayar, keyword[$ne]=test gibi saldırıları engeller
  */
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
+
+/**
+ * Query Parser Güvenliği
+ * 
+ * Express'in varsayılan query parser'ı (qs) nested object'lere izin verir.
+ * Bu NoSQL injection riski oluşturur. Simple query parser kullan.
+ */
+app.set('query parser', 'simple');
 
 /**
  * Morgan Logger
@@ -146,7 +181,6 @@ app.use(express.urlencoded({ extended: true }));
 if (config.server.isDevelopment) {
     app.use(morgan('dev'));
 }
-
 // ====================================
 // 4. STATİK DOSYALAR (Frontend)
 // ====================================
@@ -181,6 +215,119 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /api/news/health
+ * 
+ * Detaylı sağlık kontrolü endpoint'i.
+ * Cache, DB ve cron job durumlarını döndürür.
+ * BULUT VERİTABANI İÇİN GENİŞLETİLMİŞ
+ */
+const { searchCache, newsListCache } = require('./utils/memoryCache');
+const { News, isHealthy, mongoose } = require('./models');
+
+app.get('/api/news/health', async (req, res) => {
+    const startTime = Date.now();
+    
+    // Veritabanı kontrolü - detaylı
+    let dbStatus = 'unknown';
+    let newsCount = 0;
+    let dbInfo = {};
+    
+    try {
+        // Bağlantı sağlığı kontrolü
+        const dbHealthy = isHealthy();
+        
+        if (dbHealthy) {
+            newsCount = await News.countDocuments({ isActive: true });
+            dbStatus = 'connected';
+            
+            // Bulut veritabanı bilgileri
+            const host = mongoose.connection.host;
+            const isCloud = host && !host.includes('localhost') && !host.includes('127.0.0.1');
+            
+            dbInfo = {
+                host: host,
+                name: mongoose.connection.name,
+                isCloud: isCloud,
+                readyState: mongoose.connection.readyState,
+                // Replica set bilgisi (bulut için)
+                replicaSet: mongoose.connection.config?.replicaSet || null
+            };
+        } else {
+            dbStatus = 'disconnected';
+        }
+    } catch (err) {
+        dbStatus = 'error: ' + err.message;
+    }
+    
+    // Cache istatistikleri
+    const cacheStats = {
+        search: searchCache.getStats(),
+        newsList: newsListCache.getStats()
+    };
+    
+    // Cron job durumu
+    const cronStats = cronManager.getStats();
+    
+    const responseTime = Date.now() - startTime;
+    
+    res.json({
+        success: true,
+        status: dbStatus === 'connected' ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        responseTime: `${responseTime}ms`,
+        database: {
+            status: dbStatus,
+            activeNews: newsCount,
+            ...dbInfo
+        },
+        cache: cacheStats,
+        cronJobs: cronStats,
+        memory: {
+            heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+        }
+    });
+});
+
+/**
+ * GET /api/news/cache/stats
+ * 
+ * Cache istatistiklerini döndür
+ */
+app.get('/api/news/cache/stats', (req, res) => {
+    res.json({
+        success: true,
+        stats: {
+            search: searchCache.getStats(),
+            newsList: newsListCache.getStats()
+        }
+    });
+});
+
+/**
+ * DELETE /api/news/cache/clear
+ * 
+ * Cache'i temizle (API key gerektirir)
+ */
+const apiKeyMiddleware = require('./middleware/apiKey');
+app.delete('/api/news/cache/clear', apiKeyMiddleware, (req, res) => {
+    const { type } = req.query;
+    
+    if (type === 'search') {
+        searchCache.clear();
+        return res.json({ success: true, message: 'Search cache temizlendi' });
+    } else if (type === 'list') {
+        newsListCache.clear();
+        return res.json({ success: true, message: 'News list cache temizlendi' });
+    } else {
+        searchCache.clear();
+        newsListCache.clear();
+        return res.json({ success: true, message: 'Tüm cache temizlendi' });
+    }
+});
+
+/**
  * GET /
  * 
  * Ana sayfa - API bilgileri
@@ -191,7 +338,8 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         description: 'Türkiye haber siteleri için web scraping API',
         endpoints: {
-            health: 'GET /health',
+            health: 'GET /health veya GET /api/news/health',
+            cacheStats: 'GET /api/news/cache/stats',
             search: 'GET /api/news/search?keyword=&category=&source=',
             latest: 'GET /api/news/latest?limit=10',
             categories: 'GET /api/news/categories',
@@ -214,8 +362,20 @@ app.get('/', (req, res) => {
  * Belirli bir prefix altında router'ı monte eder.
  * /api/news prefix'i altındaki tüm istekler newsRoutes'a gider.
  */
-// Apply basic rate limiting to all /api routes (use Redis-backed limiter in production for distributed apps)
+// Burst koruması (saniyede 10 istek limiti)
+const { burstLimiter, searchLimiter, scrapeLimiter } = require('./middleware');
+app.use('/api', burstLimiter);
+
+// Genel API rate limit
 app.use('/api', rateLimiter);
+
+// Arama endpoint'i için özel limit
+app.use('/api/news/live-search', searchLimiter);
+app.use('/api/news/search', searchLimiter);
+
+// Scrape endpoint'i için sıkı limit
+app.use('/api/news/scrape', scrapeLimiter);
+
 app.use('/api/news', newsRoutes);
 
 // ====================================

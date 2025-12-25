@@ -217,32 +217,53 @@ class RSSNewsScraper {
     /**
      * Try to fetch the article page and extract og:image / twitter:image as fallback.
      * This is used when feed doesn't provide a unique image.
+     * Google News URL'leri redirect olduğu için maxRedirects ayarı var.
      */
     async fetchArticleImage(url) {
         if (!url) return null;
         try {
-            const res = await axios.get(url, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const res = await axios.get(url, { 
+                timeout: 8000, 
+                maxRedirects: 5,  // Google News redirect'lerini takip et
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
+                } 
+            });
             const html = res.data;
             const $ = cheerio.load(html);
 
-            // Open Graph
+            // Open Graph - en güvenilir kaynak
             const og = $('meta[property="og:image"]').attr('content') || $('meta[name="og:image"]').attr('content');
-            if (og) return og;
+            if (og && og.startsWith('http')) return og;
 
-            // Twitter
+            // Twitter Card
             const tw = $('meta[name="twitter:image"]').attr('content') || $('meta[property="twitter:image"]').attr('content');
-            if (tw) return tw;
+            if (tw && tw.startsWith('http')) return tw;
 
             // Link rel image_src
             const linkImg = $('link[rel="image_src"]').attr('href');
-            if (linkImg) return linkImg;
+            if (linkImg && linkImg.startsWith('http')) return linkImg;
 
-            // Fallback: first img in article content
-            const firstImg = $('article img').first().attr('src') || $('img').first().attr('src');
-            if (firstImg) return firstImg;
+            // Schema.org image
+            const schemaImg = $('meta[itemprop="image"]').attr('content');
+            if (schemaImg && schemaImg.startsWith('http')) return schemaImg;
+
+            // Fallback: article içindeki ilk büyük resim
+            const articleImg = $('article img[src^="http"]').first().attr('src');
+            if (articleImg) return articleImg;
+
+            // Son çare: sayfadaki herhangi bir resim
+            const anyImg = $('img[src^="http"]').filter((i, el) => {
+                const src = $(el).attr('src') || '';
+                // Küçük ikonları ve tracking piksellerini atla
+                return !src.includes('icon') && !src.includes('logo') && !src.includes('avatar') && !src.includes('1x1');
+            }).first().attr('src');
+            if (anyImg) return anyImg;
 
         } catch (err) {
-            // console.warn('fetchArticleImage failed:', err.message);
+            // Google News bazen 403 verebilir, sessizce devam et
         }
         return null;
     }
@@ -269,11 +290,32 @@ class RSSNewsScraper {
                     const titleParts = title.split(' - ');
                     if (titleParts.length > 1) source = titleParts[titleParts.length - 1].trim();
                     
+                    // Google News RSS'den gelen URL (redirect URL olabilir)
+                    const articleUrl = item.link;
+                    
+                    // Google News RSS genelde görsel vermez, HER ZAMAN makale sayfasından çek
+                    let imageUrl = null;
+                    if (articleUrl) {
+                        try {
+                            imageUrl = await this.fetchArticleImage(articleUrl);
+                            if (imageUrl) {
+                                console.log(`  📷 Görsel bulundu: ${source}`);
+                            }
+                        } catch (imgErr) {
+                            // Görsel çekme başarısız olursa sessizce devam et
+                        }
+                    }
+                    
+                    // Fallback: RSS'den gelen görsel (genelde yok)
+                    if (!imageUrl) {
+                        imageUrl = this.extractImageUrl(item);
+                    }
+                    
                     results.push({
                         title: titleParts.slice(0, -1).join(' - ').trim() || title,
                         description: description.substring(0, 500).trim(),
-                        url: item.link,
-                        imageUrl: this.extractImageUrl(item),
+                        url: articleUrl,
+                        imageUrl: imageUrl,
                         publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
                         source: source,
                         category: 'Google News',

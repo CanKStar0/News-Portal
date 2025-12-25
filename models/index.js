@@ -9,11 +9,12 @@
  * şeklinde kullanılabilir.
  */
 
-const { connectDatabase, mongoose } = require('./database');
+const { connectDatabase, mongoose, isHealthy } = require('./database');
 const News = require('./News');
 
 module.exports = {
     connectDatabase,
     mongoose,
+    isHealthy,
     News
 };

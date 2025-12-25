@@ -148,8 +148,8 @@ class CronJobManager {
             console.log('\n🧹 ZAMANLANMIŞ TEMİZLİK BAŞLIYOR\n');
 
             try {
-                // 30 günden eski haberleri deaktive et
-                const count = await scraperService.cleanupOldNews(30, false);
+                // 5 günden eski haberleri deaktive et (kullanıcı isteği)
+                const count = await scraperService.cleanupOldNews(5, false);
                 console.log(`✅ ${count} eski haber deaktive edildi`);
 
             } catch (error) {

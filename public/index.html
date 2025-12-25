@@ -25,6 +25,9 @@
         .search-hint { text-align: center; margin-top: 12px; font-size: 0.8rem; color: #666; }
         .search-hint span { background: rgba(255,255,255,0.1); padding: 3px 10px; border-radius: 15px; margin: 0 3px; cursor: pointer; transition: all 0.2s; }
         .search-hint span:hover { background: rgba(0,217,255,0.2); color: #00d9ff; }
+        .deep-search-notice { display: none; text-align: center; margin-top: 15px; padding: 12px 20px; background: linear-gradient(90deg, rgba(255,165,0,0.15), rgba(255,100,0,0.15)); border: 1px solid rgba(255,165,0,0.3); border-radius: 12px; color: #ffaa00; font-size: 0.9rem; font-weight: 500; animation: pulse 2s infinite; }
+        .deep-search-notice i { margin-right: 8px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .categories-container { max-width: 1200px; margin: 0 auto 25px; padding: 0 20px; text-align: center; }
         .categories-title { font-size: 0.8rem; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px; }
         .categories { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -81,6 +84,7 @@
             <button class="search-btn" id="searchBtn" onclick="searchNews()"><i class="fas fa-search"></i> Ara</button>
         </div>
         <div class="search-hint">Populer: <span onclick="quickSearch('hava durumu')">Hava Durumu</span> <span onclick="quickSearch('dolar')">Dolar</span> <span onclick="quickSearch('altin')">Altin</span> <span onclick="quickSearch('galatasaray')">Galatasaray</span> <span onclick="quickSearch('bitcoin')">Bitcoin</span></div>
+        <div class="deep-search-notice" id="deepSearchNotice"><i class="fas fa-sync fa-spin"></i>Veriler tekrar araniyor lutfen bekleyiniz...</div>
     </div>
     <div class="categories-container">
         <p class="categories-title">Kategoriler (tikla ve haberleri gor)</p>
@@ -124,8 +128,10 @@
             currentSearch = keyword; currentPage = 1; currentCategory = '';
             document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
             const newsGrid = document.getElementById('newsGrid'), searchBtn = document.getElementById('searchBtn');
+            const deepSearchNotice = document.getElementById('deepSearchNotice');
             searchBtn.disabled = true; searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Araniyor...';
             newsGrid.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + keyword + ' icin araniyor...</p></div>';
+            deepSearchNotice.style.display = 'none';
             // HEMEN searchMode'u guncelle - sonuc gelmeden once
             document.getElementById('searchMode').style.display = 'block';
             document.getElementById('searchKeyword').textContent = '"' + keyword + '" araniyor...';
@@ -134,6 +140,13 @@
                 const response = await fetch('/api/news/live-search?keyword=' + encodeURIComponent(keyword));
                 const data = await response.json();
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                
+                // Eger isScrapingMore true ise, deep search yapildi demektir
+                if (data.data && data.data.isScrapingMore) {
+                    deepSearchNotice.style.display = 'block';
+                    setTimeout(() => { deepSearchNotice.style.display = 'none'; }, 5000);
+                }
+                
                 if (data.success && data.data.news.length > 0) {
                     allNews = data.data.news; filteredNews = allNews;
                     document.getElementById('totalNews').textContent = allNews.length + ' haber';

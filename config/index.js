@@ -39,20 +39,31 @@ const config = {
     database: {
         // MongoDB bağlantı URI'si
         uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/haber_db',
-        // Mongoose bağlantı seçenekleri
+        // Mongoose bağlantı seçenekleri - BULUT İÇİN OPTİMİZE
         options: {
-            // Connection pooling ve performans için önerilen ayarlar
-            // maxPoolSize: maksimum bağlantı sayısı
-            // minPoolSize: minimum açık bağlantı sayısı
-            // serverSelectionTimeoutMS: ilk bağlantı zaman aşımı
-            // socketTimeoutMS: socket zaman aşımı
-            maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE) || 50,
+            // Connection pooling - bulut için önemli
+            // maxPoolSize: maksimum bağlantı sayısı (Atlas free tier: 500)
+            // minPoolSize: minimum açık bağlantı sayısı (bağlantı ısınması için)
+            maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE) || 20,
             minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE) || 5,
+            
+            // Timeout ayarları - bulut için daha uzun
             serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 30000,
-            socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT_MS) || 45000,
-            // Yeni sürümler için önerilen seçenekler
-            useNewUrlParser: true,
-            useUnifiedTopology: true
+            socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT_MS) || 60000,
+            connectTimeoutMS: parseInt(process.env.MONGO_CONNECT_TIMEOUT_MS) || 30000,
+            
+            // Heartbeat - bağlantı sağlığı kontrolü
+            heartbeatFrequencyMS: 10000,
+            
+            // Retry ayarları - ağ kesintilerinde otomatik yeniden bağlan
+            retryWrites: true,
+            retryReads: true,
+            
+            // Write concern - veri güvenliği için
+            w: 'majority',
+            
+            // Compression - bandwidth tasarrufu (bulut maliyeti düşürür)
+            compressors: ['zlib']
         }
     },
 
