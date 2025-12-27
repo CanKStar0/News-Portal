@@ -1,44 +1,57 @@
-﻿/**
+/**
  * ===========================================
  * HABER API ROUTE'LARI
  * ===========================================
  * 
- * Bu dosya, haber ile ilgili tÃ¼m API endpoint'lerini tanÄ±mlar.
+ * Bu dosya, haber ile ilgili tüm API endpoint'lerini tanımlar.
  * 
- * REST API TASARIM PRENSÄ°PLERÄ°:
+ * REST API TASARIM PRENSİPLERİ:
  * - GET: Veri okuma (idempotent - yan etkisiz)
- * - POST: Yeni kayÄ±t oluÅŸturma
- * - PUT: Mevcut kaydÄ± gÃ¼ncelleme (tÃ¼mÃ¼)
- * - PATCH: Mevcut kaydÄ± kÄ±smi gÃ¼ncelleme
- * - DELETE: KayÄ±t silme
+ * - POST: Yeni kayıt oluşturma
+ * - PUT: Mevcut kaydı güncelleme (tümü)
+ * - PATCH: Mevcut kaydı kısmi güncelleme
+ * - DELETE: Kayıt silme
  * 
- * EXPRESS ROUTER NEDÄ°R?
- * Router, route'larÄ± gruplamak ve modÃ¼ler hale getirmek iÃ§in kullanÄ±lÄ±r.
- * Her dosya kendi router'Ä±nÄ± tanÄ±mlar, sonra app.js'de birleÅŸtirilir.
+ * EXPRESS ROUTER NEDİR?
+ * Router, route'ları gruplamak ve modüler hale getirmek için kullanılır.
+ * Her dosya kendi router'ını tanımlar, sonra app.js'de birleştirilir.
  */
 
 const express = require('express');
 const router = express.Router();
 const { News } = require('../models');
 const { scraperService } = require('../services');
-const { asyncHandler, apiKey } = require('../middleware');
+const { asyncHandler, apiKey, validateKeyword, validateCategory, validatePagination } = require('../middleware');
 const config = require('../config');
 const redis = require('../utils/redisClient');
+const { searchCache, newsListCache } = require('../utils/memoryCache');
+
+// Sadece gerekli alanları döndürmek için projeksiyon
+const NEWS_PROJECTION = {
+    _id: 1,
+    title: 1,
+    summary: 1,
+    url: 1,
+    imageUrl: 1,
+    publishedAt: 1,
+    source: 1,
+    category: 1
+};
 
 /**
  * ===========================================
  * GET /api/news
  * ===========================================
  * 
- * TÃ¼m haberleri listele (sayfalama ile)
+ * Tüm haberleri listele (sayfalama ile) - CACHE DESTEKLİ
  * 
  * Query parametreleri:
- * - page: Sayfa numarasÄ± (varsayÄ±lan: 1)
- * - limit: Sayfa baÅŸÄ±na haber sayÄ±sÄ± (varsayÄ±lan: 12)
+ * - page: Sayfa numarası (varsayılan: 1)
+ * - limit: Sayfa başına haber sayısı (varsayılan: 12)
  * - category: Kategori filtresi (opsiyonel)
  * - search: Arama terimi (opsiyonel)
  * 
- * Ã–rnek: GET /api/news?page=1&limit=12&category=Ekonomi
+ * Örnek: GET /api/news?page=1&limit=12&category=Ekonomi
  */
 router.get('/', asyncHandler(async (req, res) => {
     const { page = 1, limit = 12, category, search } = req.query;
@@ -47,33 +60,46 @@ router.get('/', asyncHandler(async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 12, 50);
     const skip = (pageNum - 1) * limitNum;
     
-    // Sorgu objesi oluÅŸtur
-    const query = { isActive: true };
+    // Cache key oluştur
+    const cacheKey = `news:list:${pageNum}:${limitNum}:${category || 'all'}:${search || 'none'}`;
     
-    // Kategori filtresi
-    if (category) {
-        query.category = { $regex: new RegExp(category, 'i') };
+    // Cache'den kontrol et
+    const cached = newsListCache.get(cacheKey);
+    if (cached) {
+        console.log(`📦 Cache HIT: ${cacheKey}`);
+        return res.json({ ...cached, fromCache: true });
     }
     
-    // Arama filtresi
+    // Sorgu objesi oluştur
+    const query = { isActive: true };
+    
+    // Kategori filtresi (güvenli regex)
+    if (category) {
+        const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        query.category = { $regex: new RegExp(safeCategory, 'i') };
+    }
+    
+    // Arama filtresi (güvenli regex)
     if (search) {
+        const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         query.$or = [
-            { title: { $regex: new RegExp(search, 'i') } },
-            { summary: { $regex: new RegExp(search, 'i') } }
+            { title: { $regex: new RegExp(safeSearch, 'i') } },
+            { summary: { $regex: new RegExp(safeSearch, 'i') } }
         ];
     }
     
-    // Toplam sayÄ±yÄ± al
+    // Toplam sayıyı al
     const total = await News.countDocuments(query);
     
-    // Haberleri getir
+    // Haberleri getir - sadece gerekli alanlar
     const news = await News.find(query)
         .sort({ publishedAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('-__v');
+        .select(NEWS_PROJECTION)
+        .lean();
     
-    res.json({
+    const response = {
         success: true,
         data: news,
         pagination: {
@@ -84,7 +110,12 @@ router.get('/', asyncHandler(async (req, res) => {
             hasNext: pageNum < Math.ceil(total / limitNum),
             hasPrev: pageNum > 1
         }
-    });
+    };
+    
+    // Cache'e kaydet (2 dakika)
+    newsListCache.set(cacheKey, response, 120);
+    
+    res.json(response);
 }));
 
 /**
@@ -92,123 +123,256 @@ router.get('/', asyncHandler(async (req, res) => {
  * GET /api/news/live-search
  * ===========================================
  * 
- * CANLI ARAMA + VERÄ°TABANINA KAYDET + VERÄ°TABANINDAN GETÄ°R
+ * HIZLI ARAMA: DB + GOOGLE NEWS PARALEL, BOŞSA FULL SCRAPE - CACHE DESTEKLİ
  * 
- * AkÄ±ÅŸ:
- * 1. RSS/Google News'den canlÄ± scrape yap
- * 2. SonuÃ§larÄ± veritabanÄ±na kaydet (upsert - tekrar engellenir)
- * 3. VeritabanÄ±ndan anahtar kelimeye gÃ¶re sorgu yap
- * 4. SonuÃ§larÄ± dÃ¶ndÃ¼r
+ * Akış:
+ * 1. Veritabanı + Google News paralel sorgulanır (hızlı)
+ * 2. Google News sonuçları DB'ye kaydedilir
+ * 3. Eğer DB'de sonuç yoksa → full scrape yapılır
+ * 4. Sonuçlar döndürülür + scraping durumu bildirilir
  * 
  * Query parametreleri:
  * - keyword: Aranacak kelime (zorunlu)
- * - limit: SonuÃ§ sayÄ±sÄ± (varsayÄ±lan: 50)
+ * - limit: Sonuç sayısı (varsayılan: 50)
  * 
- * Ã–rnek: GET /api/news/live-search?keyword=dolar&limit=30
+ * Örnek: GET /api/news/live-search?keyword=dolar&limit=30
  */
 router.get('/live-search', asyncHandler(async (req, res) => {
     const { keyword, limit = 50 } = req.query;
     
-    if (!keyword || keyword.trim() === '') {
+    // Güvenli input validation
+    const keywordValidation = validateKeyword(keyword);
+    if (!keywordValidation.valid) {
         return res.status(400).json({
             success: false,
-            message: 'Arama terimi gerekli'
+            message: keywordValidation.message
         });
     }
 
-    const q = keyword.trim();
-    const limitNum = Math.min(parseInt(limit) || 50, 100);
-    const startTime = Date.now();
-
-    // Trend kaydÄ±
-    // Trend servisi devre dışı
-
-    // 1. CanlÄ± scrape yap (RSS + Google News)
-    console.log(`ğŸ” CanlÄ± arama baÅŸlatÄ±lÄ±yor: "${q}"`);
-    const scrapeResult = await scraperService.liveSearch(q);
+    const q = keywordValidation.keyword;
+    const { limit: limitNum } = validatePagination(1, limit);
     
-    // 1.5 Resmi olmayan haberler iÃ§in resim Ã§ek
-    if (scrapeResult.news && scrapeResult.news.length > 0) {
-        // Resimler scraper'da otomatik ekleniyor
-        // Resimler RSSNewsScraper tarafından otomatik ekleniyor
+    // Cache key oluştur
+    const cacheKey = `search:${q.toLowerCase()}:${limitNum}`;
+    
+    // Cache'den kontrol et (5 dakika geçerli)
+    const cached = searchCache.get(cacheKey);
+    if (cached) {
+        console.log(`📦 Search Cache HIT: ${cacheKey}`);
+        return res.json({ ...cached, fromCache: true, cacheDuration: '5min' });
     }
     
-    // 2. Scrape edilen haberleri veritabanÄ±na kaydet
+    const startTime = Date.now();
+
+    console.log(`🔍 Hızlı arama başlatılıyor: "${q}"`);
+
+    /**
+     * OPTİMİZASYON: $regex yerine $text search kullan
+     * 
+     * $regex SORUNU:
+     * - Her dökümanı sırayla tarar (full collection scan)
+     * - 4000 haber × ortalama 2KB = 8MB veri taranıyor
+     * - Index KULLANILAMAZ
+     * - O(n) karmaşıklık
+     * 
+     * $text ÇÖZÜMÜ:
+     * - Text index kullanır (B-tree)
+     * - Sadece index'te arama yapar
+     * - O(log n) karmaşıklık
+     * - 100-1000x daha hızlı!
+     */
+    
+    // PROJECTION - Sadece gerekli alanlar (kritik optimizasyon!)
+    const projection = {
+        _id: 1,
+        title: 1,
+        summary: 1,
+        url: 1,
+        imageUrl: 1,
+        publishedAt: 1,
+        source: 1,
+        category: 1,
+        score: { $meta: 'textScore' }
+    };
+    
+    // DB sorgu objesi - $text search kullan
+    const dbQuery = {
+        isActive: true,
+        $text: { $search: q }
+    };
+
+    // 1. PARALEL: Veritabanı + Google News aynı anda
+    const RSSNewsScraper = require('../scrapers/sites/RSSNewsScraper');
+    const rssScraper = new RSSNewsScraper();
+    
+    const [dbNews, googleNews] = await Promise.all([
+        News.find(dbQuery, projection)
+            .sort({ score: { $meta: 'textScore' } })
+            .limit(limitNum)
+            .lean(),
+        rssScraper.searchGoogleNews(q).catch(err => {
+            console.warn('⚠️ Google News hatası:', err.message);
+            return [];
+        })
+    ]);
+
+    console.log(`� DB: ${dbNews.length} sonuç, Google News: ${googleNews.length} sonuç`);
+
+    // 2. Google News sonuçlarını DB'ye kaydet (arka planda)
     let savedCount = 0;
     let duplicateCount = 0;
     
-    if (scrapeResult.news && scrapeResult.news.length > 0) {
-        console.log(`ğŸ’¾ ${scrapeResult.news.length} haber veritabanÄ±na kaydediliyor...`);
-        
-        for (const newsItem of scrapeResult.news) {
+    if (googleNews.length > 0) {
+        for (const newsItem of googleNews) {
             try {
                 const updateResult = await News.updateOne(
                     { url: newsItem.url },
                     {
                         $set: {
                             title: newsItem.title,
-                            summary: newsItem.summary || newsItem.description,
+                            summary: newsItem.description || '',
                             url: newsItem.url,
                             imageUrl: newsItem.imageUrl || newsItem.image,
-                            category: newsItem.category || 'Genel',
+                            category: newsItem.category || 'Google News',
                             source: newsItem.source,
-                            keywords: newsItem.keywords || [q.toLowerCase()],
+                            keywords: [q.toLowerCase()],
                             publishedAt: newsItem.publishedAt ? new Date(newsItem.publishedAt) : new Date(),
                             scrapedAt: new Date(),
                             isActive: true
                         },
-                        $setOnInsert: {
-                            createdAt: new Date()
-                        }
+                        $setOnInsert: { createdAt: new Date() }
                     },
                     { upsert: true }
                 );
                 
-                if (updateResult.upsertedCount > 0) {
-                    savedCount++;
-                } else {
-                    duplicateCount++;
-                }
+                if (updateResult.upsertedCount > 0) savedCount++;
+                else duplicateCount++;
             } catch (err) {
                 if (err.code !== 11000) {
-                    console.warn(`âš ï¸ Haber kaydetme hatasÄ±: ${err.message}`);
+                    console.warn(`⚠️ Haber kaydetme hatası: ${err.message}`);
                 }
             }
         }
-        console.log(`âœ… KayÄ±t tamamlandÄ±: ${savedCount} yeni, ${duplicateCount} mevcut`);
+        console.log(`✅ Google News kaydedildi: ${savedCount} yeni, ${duplicateCount} mevcut`);
     }
 
-    // 3. VeritabanÄ±ndan anahtar kelimeye gÃ¶re sorgula
-    const dbQuery = {
-        isActive: true,
-        $or: [
-            { title: { $regex: q, $options: 'i' } },
-            { summary: { $regex: q, $options: 'i' } },
-            { keywords: { $regex: q, $options: 'i' } }
-        ]
-    };
+    // 3. Eğer DB'de hiç sonuç yoksa → full scrape yap
+    let isScrapingMore = false;
+    let fullScrapeNews = [];
+    
+    if (dbNews.length === 0 && googleNews.length === 0) {
+        console.log(`⚠️ Veritabanında "${q}" bulunamadı, full scrape başlatılıyor...`);
+        isScrapingMore = true;
+        
+        try {
+            // Full scrape (RSS kaynaklarından arama)
+            const scrapeResult = await scraperService.liveSearch(q);
+            
+            if (scrapeResult.news && scrapeResult.news.length > 0) {
+                console.log(`💾 ${scrapeResult.news.length} haber bulundu, DB'ye kaydediliyor...`);
+                
+                for (const newsItem of scrapeResult.news) {
+                    try {
+                        const updateResult = await News.updateOne(
+                            { url: newsItem.url },
+                            {
+                                $set: {
+                                    title: newsItem.title,
+                                    summary: newsItem.summary || newsItem.description,
+                                    url: newsItem.url,
+                                    imageUrl: newsItem.imageUrl || newsItem.image,
+                                    category: newsItem.category || 'Genel',
+                                    source: newsItem.source,
+                                    keywords: newsItem.keywords || [q.toLowerCase()],
+                                    publishedAt: newsItem.publishedAt ? new Date(newsItem.publishedAt) : new Date(),
+                                    scrapedAt: new Date(),
+                                    isActive: true
+                                },
+                                $setOnInsert: { createdAt: new Date() }
+                            },
+                            { upsert: true }
+                        );
+                        
+                        if (updateResult.upsertedCount > 0) savedCount++;
+                        else duplicateCount++;
+                    } catch (err) {
+                        if (err.code !== 11000) {
+                            console.warn(`⚠️ Haber kaydetme hatası: ${err.message}`);
+                        }
+                    }
+                }
+                
+                // Scrape sonrası DB'den tekrar çek (optimize edilmiş sorgu)
+                fullScrapeNews = await News.find(dbQuery, projection)
+                    .sort({ score: { $meta: 'textScore' } })
+                    .limit(limitNum)
+                    .lean();
+            }
+        } catch (err) {
+            console.error('❌ Full scrape hatası:', err.message);
+        }
+    }
 
-    const dbNews = await News.find(dbQuery)
-        .sort({ publishedAt: -1 })
-        .limit(limitNum)
-        .lean();
+    // 4. Sonuçları birleştir ve döndür
+    // DB'den gelenler + Google News'ten yeni gelenler
+    const allResults = [...dbNews];
+    
+    // Google News'ten gelen ama DB'de olmayanları ekle
+    const existingUrls = new Set(dbNews.map(n => n.url));
+    for (const gn of googleNews) {
+        if (!existingUrls.has(gn.url)) {
+            allResults.push({
+                title: gn.title,
+                summary: gn.description || '',
+                url: gn.url,
+                imageUrl: gn.imageUrl,
+                category: gn.category || 'Google News',
+                source: gn.source,
+                publishedAt: gn.publishedAt
+            });
+        }
+    }
+    
+    // Full scrape sonuçlarını ekle
+    if (fullScrapeNews.length > 0) {
+        for (const fn of fullScrapeNews) {
+            if (!existingUrls.has(fn.url)) {
+                allResults.push(fn);
+                existingUrls.add(fn.url);
+            }
+        }
+    }
+
+    // Tarihe göre sırala ve limitle
+    allResults.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    const finalNews = allResults.slice(0, limitNum);
 
     const duration = Date.now() - startTime;
 
-    // 4. SonuÃ§larÄ± dÃ¶ndÃ¼r
-    res.json({
+    // 5. Sonuç objesi oluştur
+    const response = {
         success: true,
         data: {
             keyword: q,
-            news: dbNews,
-            count: dbNews.length,
-            scraped: scrapeResult.news?.length || 0,
+            news: finalNews,
+            count: finalNews.length,
+            fromDatabase: dbNews.length,
+            fromGoogleNews: googleNews.length,
             saved: savedCount,
             duplicates: duplicateCount,
+            isScrapingMore,
             duration,
-            source: 'scrape+database'
+            source: isScrapingMore ? 'full-scrape' : 'db+google'
         }
-    });
+    };
+    
+    // 6. Cache'e kaydet (5 dakika) - sadece sonuç varsa
+    if (finalNews.length > 0) {
+        searchCache.set(cacheKey, response, 300);
+        console.log(`📦 Search Cache SET: ${cacheKey}`);
+    }
+    
+    res.json(response);
 }));
 
 /**
@@ -216,19 +380,19 @@ router.get('/live-search', asyncHandler(async (req, res) => {
  * GET /api/news/live-category
  * ===========================================
  * 
- * KATEGORÄ°YE GÃ–RE CANLI HABER Ã‡EK + VERÄ°TABANINA KAYDET + VERÄ°TABANINDAN GETÄ°R
+ * KATEGORİYE GÖRE CANLI HABER ÇEK + VERİTABANINA KAYDET + VERİTABANINDAN GETİR
  * 
- * AkÄ±ÅŸ:
- * 1. RSS'den o kategorideki haberleri canlÄ± scrape yap
- * 2. SonuÃ§larÄ± veritabanÄ±na kaydet
- * 3. VeritabanÄ±ndan kategoriye gÃ¶re sorgu yap
- * 4. SonuÃ§larÄ± dÃ¶ndÃ¼r
+ * Akış:
+ * 1. RSS'den o kategorideki haberleri canlı scrape yap
+ * 2. Sonuçları veritabanına kaydet
+ * 3. Veritabanından kategoriye göre sorgu yap
+ * 4. Sonuçları döndür
  * 
  * Query parametreleri:
- * - category: Kategori adÄ± (zorunlu)
- * - limit: SonuÃ§ sayÄ±sÄ± (varsayÄ±lan: 50)
+ * - category: Kategori adı (zorunlu)
+ * - limit: Sonuç sayısı (varsayılan: 50)
  * 
- * Ã–rnek: GET /api/news/live-category?category=Spor&limit=30
+ * Örnek: GET /api/news/live-category?category=Spor&limit=30
  */
 router.get('/live-category', asyncHandler(async (req, res) => {
     const { category, limit = 50 } = req.query;
@@ -244,22 +408,16 @@ router.get('/live-category', asyncHandler(async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 50, 100);
     const startTime = Date.now();
 
-    // 1. CanlÄ± scrape yap
-    console.log(`ğŸ“‚ Kategori haberleri Ã§ekiliyor: "${cat}"`);
+    // 1. Canlı scrape yap
+    console.log(`📂 Kategori haberleri çekiliyor: "${cat}"`);
     const scrapeResult = await scraperService.liveCategory(cat);
     
-    // 1.5 Resmi olmayan haberler iÃ§in resim Ã§ek
-    if (scrapeResult.news && scrapeResult.news.length > 0) {
-        // Resimler scraper'da otomatik ekleniyor
-        // Resimler RSSNewsScraper tarafından otomatik ekleniyor
-    }
-    
-    // 2. Scrape edilen haberleri veritabanÄ±na kaydet
+    // 2. Scrape edilen haberleri veritabanına kaydet
     let savedCount = 0;
     let duplicateCount = 0;
     
     if (scrapeResult.news && scrapeResult.news.length > 0) {
-        console.log(`ğŸ’¾ ${scrapeResult.news.length} haber veritabanÄ±na kaydediliyor...`);
+        console.log(`💾 ${scrapeResult.news.length} haber veritabanına kaydediliyor...`);
         
         for (const newsItem of scrapeResult.news) {
             try {
@@ -292,25 +450,38 @@ router.get('/live-category', asyncHandler(async (req, res) => {
                 }
             } catch (err) {
                 if (err.code !== 11000) {
-                    console.warn(`âš ï¸ Haber kaydetme hatasÄ±: ${err.message}`);
+                    console.warn(`⚠️ Haber kaydetme hatası: ${err.message}`);
                 }
             }
         }
-        console.log(`âœ… KayÄ±t tamamlandÄ±: ${savedCount} yeni, ${duplicateCount} mevcut`);
+        console.log(`✅ Kayıt tamamlandı: ${savedCount} yeni, ${duplicateCount} mevcut`);
     }
 
-    // 3. VeritabanÄ±ndan kategoriye gÃ¶re sorgula
+    // 3. Veritabanından kategoriye göre sorgula (optimize edilmiş)
+    // PROJECTION ile sadece gerekli alanları çek
+    const categoryProjection = {
+        _id: 1,
+        title: 1,
+        summary: 1,
+        url: 1,
+        imageUrl: 1,
+        publishedAt: 1,
+        source: 1,
+        category: 1
+    };
+    
     const dbNews = await News.find({
         isActive: true,
-        category: { $regex: cat, $options: 'i' }
+        category: { $regex: `^${cat}$`, $options: 'i' }  // Tam eşleşme (daha hızlı)
     })
+        .select(categoryProjection)
         .sort({ publishedAt: -1 })
         .limit(limitNum)
         .lean();
 
     const duration = Date.now() - startTime;
 
-    // 4. SonuÃ§larÄ± dÃ¶ndÃ¼r
+    // 4. Sonuçları döndür
     res.json({
         success: true,
         data: {
@@ -331,19 +502,18 @@ router.get('/live-category', asyncHandler(async (req, res) => {
  * GET /api/news/search
  * ===========================================
  * 
- * Haber arama endpoint'i (veritabanÄ±ndan)
+ * Haber arama endpoint'i (veritabanı + Google News)
+ * EN YENİ haberler önce gelir!
  * 
  * Query parametreleri:
- * - keyword: Aranacak kelime (opsiyonel)
+ * - keyword: Aranacak kelime (zorunlu)
  * - category: Kategori filtresi (opsiyonel)
  * - source: Kaynak filtresi (opsiyonel)
- * - page: Sayfa numarasÄ± (varsayÄ±lan: 1)
- * - limit: Sayfa baÅŸÄ±na haber sayÄ±sÄ± (varsayÄ±lan: 20)
- * - startDate: BaÅŸlangÄ±Ã§ tarihi (opsiyonel)
- * - endDate: BitiÅŸ tarihi (opsiyonel)
+ * - page: Sayfa numarası (varsayılan: 1)
+ * - limit: Sayfa başına haber sayısı (varsayılan: 50)
  * 
- * Ã–rnek kullanÄ±m:
- * GET /api/news/search?category=finans&keyword=bitcoin&page=1&limit=10
+ * Örnek kullanım:
+ * GET /api/news/search?keyword=bitcoin&limit=50
  * 
  * Response:
  * {
@@ -355,39 +525,137 @@ router.get('/live-category', asyncHandler(async (req, res) => {
  * }
  */
 router.get('/search', asyncHandler(async (req, res) => {
-    /**
-     * req.query: URL'deki query string parametreleri
-     * 
-     * ?category=finans&keyword=bitcoin
-     * -> req.query = { category: 'finans', keyword: 'bitcoin' }
-     * 
-     * Destructuring ile deÄŸerleri Ã§Ä±karÄ±yoruz:
-     */
     const {
         keyword,
         category,
         source,
         page = 1,
-        limit = 20,
-        startDate,
-        endDate
+        limit = 50
     } = req.query;
 
-    // ScraperService'i kullanarak arama yap
-    const result = await scraperService.searchNews({
-        keyword,
-        category,
-        source,
-        startDate,
-        endDate,
-        page: parseInt(page),
-        limit: parseInt(limit)
-    });
+    // Keyword zorunlu
+    if (!keyword || keyword.trim().length < 2) {
+        return res.status(400).json({
+            success: false,
+            message: 'Arama kelimesi en az 2 karakter olmalı'
+        });
+    }
 
-    // BaÅŸarÄ±lÄ± response
+    const q = keyword.trim();
+    const limitNum = Math.min(parseInt(limit) || 50, 100);
+    const pageNum = parseInt(page) || 1;
+    const startTime = Date.now();
+
+    console.log(`🔍 Search başlatıldı: "${q}"`);
+
+    // 1. Google News'den haberleri çek (her zaman)
+    const RSSNewsScraper = require('../scrapers/sites/RSSNewsScraper');
+    const rssScraper = new RSSNewsScraper();
+    
+    let googleNews = [];
+    try {
+        googleNews = await rssScraper.searchGoogleNews(q);
+        console.log(`📰 Google News: ${googleNews.length} haber bulundu`);
+        
+        // Google News haberlerini DB'ye kaydet
+        for (const newsItem of googleNews) {
+            try {
+                await News.updateOne(
+                    { url: newsItem.url },
+                    {
+                        $set: {
+                            title: newsItem.title,
+                            summary: newsItem.description || '',
+                            url: newsItem.url,
+                            imageUrl: newsItem.imageUrl,
+                            category: newsItem.category || 'Gündem',
+                            source: newsItem.source,
+                            keywords: [q.toLowerCase()],
+                            publishedAt: newsItem.publishedAt ? new Date(newsItem.publishedAt) : new Date(),
+                            scrapedAt: new Date(),
+                            isActive: true
+                        },
+                        $setOnInsert: { createdAt: new Date() }
+                    },
+                    { upsert: true }
+                );
+            } catch (err) {
+                // Duplicate hata ignore
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️ Google News hatası:', err.message);
+    }
+
+    // 2. Veritabanından ara (text search)
+    const projection = {
+        _id: 1,
+        title: 1,
+        summary: 1,
+        url: 1,
+        imageUrl: 1,
+        publishedAt: 1,
+        source: 1,
+        category: 1
+    };
+
+    let dbQuery = { isActive: true };
+    
+    // Text search kullan
+    try {
+        dbQuery.$text = { $search: q };
+    } catch (e) {
+        // Fallback: regex search
+        const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        dbQuery.$or = [
+            { title: { $regex: safeQ, $options: 'i' } },
+            { summary: { $regex: safeQ, $options: 'i' } }
+        ];
+    }
+    
+    // Kategori filtresi
+    if (category) {
+        const safeCat = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        dbQuery.category = { $regex: new RegExp(safeCat, 'i') };
+    }
+    
+    // Kaynak filtresi
+    if (source) {
+        dbQuery.source = { $regex: new RegExp(source, 'i') };
+    }
+
+    // 3. Toplam sayı ve haberler
+    const total = await News.countDocuments(dbQuery);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // EN YENİ HABERLER ÖNCE - publishedAt'e göre sırala
+    const news = await News.find(dbQuery)
+        .select(projection)
+        .sort({ publishedAt: -1 })  // En yeni önce!
+        .skip(skip)
+        .limit(limitNum)
+        .lean();
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Search tamamlandı: ${news.length} haber, ${duration}ms`);
+
     res.json({
         success: true,
-        data: result
+        data: {
+            keyword: q,
+            news: news,
+            count: news.length,
+            googleNewsCount: googleNews.length,
+            duration,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                pages: Math.ceil(total / limitNum),
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        }
     });
 }));
 
@@ -399,15 +667,15 @@ router.get('/search', asyncHandler(async (req, res) => {
  * En son haberleri getir
  * 
  * Query parametreleri:
- * - limit: KaÃ§ haber (varsayÄ±lan: 10, max: 50)
+ * - limit: Kaç haber (varsayılan: 10, max: 50)
  * - category: Kategori filtresi (opsiyonel)
  * 
- * Ã–rnek: GET /api/news/latest?limit=5&category=finans
+ * Örnek: GET /api/news/latest?limit=5&category=finans
  */
 router.get('/latest', asyncHandler(async (req, res) => {
     const { limit = 10, category } = req.query;
     
-    // Limit kontrolÃ¼ (max 50)
+    // Limit kontrolü (max 50)
     const safeLimit = Math.min(parseInt(limit) || 10, 50);
     
     // Sorgu objesi
@@ -416,14 +684,28 @@ router.get('/latest', asyncHandler(async (req, res) => {
         query.category = category.toLowerCase();
     }
     
+    // PROJECTION - Sadece gerekli alanlar
+    const projection = {
+        _id: 1,
+        title: 1,
+        summary: 1,
+        url: 1,
+        imageUrl: 1,
+        publishedAt: 1,
+        source: 1,
+        category: 1
+    };
+    
     /**
      * MongoDB Sorgusu:
-     * - find(query): Kriterlere uyan dÃ¶kÃ¼manlarÄ± bul
-     * - sort({ publishedAt: -1 }): YayÄ±n tarihine gÃ¶re azalan sÄ±rala (en yeni Ã¶nce)
-     * - limit(safeLimit): Belirtilen sayÄ±da dÃ¶kÃ¼man dÃ¶ndÃ¼r
-     * - lean(): Mongoose document yerine plain JavaScript object dÃ¶ndÃ¼r (daha hÄ±zlÄ±)
+     * - find(query): Kriterlere uyan dökümanları bul
+     * - select(projection): Sadece belirtilen alanları getir (kritik!)
+     * - sort({ publishedAt: -1 }): Yayın tarihine göre azalan sırala (en yeni önce)
+     * - limit(safeLimit): Belirtilen sayıda döküman döndür
+     * - lean(): Mongoose document yerine plain JavaScript object döndür (daha hızlı)
      */
     const news = await News.find(query)
+        .select(projection)
         .sort({ publishedAt: -1 })
         .limit(safeLimit)
         .lean();
@@ -437,10 +719,72 @@ router.get('/latest', asyncHandler(async (req, res) => {
 
 /**
  * ===========================================
+ * GET /api/news/category/:category
+ * ===========================================
+ * 
+ * Belirli bir kategorideki haberleri getir (SADECE VERİTABANINDAN)
+ * Scrape YAPMAZ - hızlı response için
+ * 
+ * Parametreler:
+ * - category: Kategori adı (URL parametresi)
+ * - limit: Sonuç sayısı (varsayılan: 50)
+ * 
+ * Örnek: GET /api/news/category/Ekonomi?limit=30
+ */
+router.get('/category/:category', asyncHandler(async (req, res) => {
+    const { category } = req.params;
+    const { limit = 50 } = req.query;
+    
+    if (!category || category.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            message: 'Kategori gerekli'
+        });
+    }
+    
+    const cat = category.trim();
+    const limitNum = Math.min(parseInt(limit) || 50, 100);
+    const startTime = Date.now();
+    
+    // PROJECTION - Sadece gerekli alanlar
+    const projection = {
+        _id: 1,
+        title: 1,
+        summary: 1,
+        url: 1,
+        imageUrl: 1,
+        publishedAt: 1,
+        source: 1,
+        category: 1
+    };
+    
+    // Veritabanından kategoriye göre sorgula (case-insensitive)
+    const news = await News.find({
+        isActive: true,
+        category: { $regex: new RegExp(`^${cat}$`, 'i') }
+    })
+        .select(projection)
+        .sort({ publishedAt: -1 })
+        .limit(limitNum)
+        .lean();
+    
+    const duration = Date.now() - startTime;
+    
+    res.json({
+        success: true,
+        category: cat,
+        count: news.length,
+        duration: `${duration}ms`,
+        data: news
+    });
+}));
+
+/**
+ * ===========================================
  * GET /api/news/categories
  * ===========================================
  * 
- * Mevcut kategorileri ve haber sayÄ±larÄ±nÄ± getir
+ * Mevcut kategorileri ve haber sayılarını getir
  * 
  * Response:
  * {
@@ -456,35 +800,35 @@ router.get('/categories', asyncHandler(async (req, res) => {
     /**
      * MongoDB Aggregation Pipeline
      * 
-     * Aggregation, verileri iÅŸlemek ve dÃ¶nÃ¼ÅŸtÃ¼rmek iÃ§in gÃ¼Ã§lÃ¼ bir araÃ§tÄ±r.
-     * SQL'deki GROUP BY, COUNT, SUM gibi iÅŸlemleri yapar.
+     * Aggregation, verileri işlemek ve dönüştürmek için güçlü bir araçtır.
+     * SQL'deki GROUP BY, COUNT, SUM gibi işlemleri yapar.
      * 
-     * Pipeline aÅŸamalarÄ±:
+     * Pipeline aşamaları:
      * 1. $match: Filtreleme (WHERE gibi)
      * 2. $group: Gruplama (GROUP BY gibi)
-     * 3. $sort: SÄ±ralama (ORDER BY gibi)
+     * 3. $sort: Sıralama (ORDER BY gibi)
      */
     const categories = await News.aggregate([
         // Sadece aktif haberleri al
         { $match: { isActive: true } },
         
-        // Kategoriye gÃ¶re grupla ve say
+        // Kategoriye göre grupla ve say
         { 
             $group: { 
-                _id: '$category',     // Gruplama alanÄ±
-                count: { $sum: 1 }     // Her kayÄ±t iÃ§in 1 ekle
+                _id: '$category',     // Gruplama alanı
+                count: { $sum: 1 }     // Her kayıt için 1 ekle
             } 
         },
         
-        // Haber sayÄ±sÄ±na gÃ¶re azalan sÄ±rala
+        // Haber sayısına göre azalan sırala
         { $sort: { count: -1 } },
         
-        // Ã‡Ä±ktÄ± formatÄ±nÄ± dÃ¼zenle
+        // Çıktı formatını düzenle
         {
             $project: {
                 _id: 0,                // _id'yi gizle
-                category: '$_id',      // _id'yi category olarak gÃ¶ster
-                count: 1               // count'u gÃ¶ster
+                category: '$_id',      // _id'yi category olarak göster
+                count: 1               // count'u göster
             }
         }
     ]);
@@ -500,7 +844,7 @@ router.get('/categories', asyncHandler(async (req, res) => {
  * GET /api/news/sources
  * ===========================================
  * 
- * Mevcut kaynaklarÄ± ve haber sayÄ±larÄ±nÄ± getir
+ * Mevcut kaynakları ve haber sayılarını getir
  */
 router.get('/sources', asyncHandler(async (req, res) => {
     const sources = await News.aggregate([
@@ -524,7 +868,7 @@ router.get('/sources', asyncHandler(async (req, res) => {
                     $switch: {
                         branches: [
                             { case: { $eq: ['$_id', 'bloomberg'] }, then: 'Bloomberg HT' },
-                            { case: { $eq: ['$_id', 'dunya'] }, then: 'DÃ¼nya Gazetesi' },
+                            { case: { $eq: ['$_id', 'dunya'] }, then: 'Dünya Gazetesi' },
                             { case: { $eq: ['$_id', 'foreks'] }, then: 'Foreks' }
                         ],
                         default: '$_id'
@@ -547,8 +891,8 @@ router.get('/sources', asyncHandler(async (req, res) => {
  * 
  * Sistem istatistiklerini getir
  * 
- * Ã–NEMLÄ°: Bu route, /:id route'undan Ã–NCE tanÄ±mlanmalÄ±!
- * Aksi halde "stats" kelimesi ObjectId olarak parse edilmeye Ã§alÄ±ÅŸÄ±lÄ±r.
+ * ÖNEMLİ: Bu route, /:id route'undan ÖNCE tanımlanmalı!
+ * Aksi halde "stats" kelimesi ObjectId olarak parse edilmeye çalışılır.
  */
 router.get('/stats', asyncHandler(async (req, res) => {
     const stats = await scraperService.getStats();
@@ -564,19 +908,19 @@ router.get('/stats', asyncHandler(async (req, res) => {
  * GET /api/news/stats/summary
  * ===========================================
  * 
- * Admin panel iÃ§in Ã¶zet istatistikler
+ * Admin panel için özet istatistikler
  */
 router.get('/stats/summary', asyncHandler(async (req, res) => {
     const totalNews = await News.countDocuments();
     
-    // BugÃ¼nkÃ¼ haberler
+    // Bugünkü haberler
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayNews = await News.countDocuments({ 
         createdAt: { $gte: today } 
     });
     
-    // Kaynak sayÄ±sÄ±
+    // Kaynak sayısı
     const sourcesCount = await News.distinct('source').then(s => s.length);
     
     res.json({
@@ -594,12 +938,12 @@ router.get('/stats/summary', asyncHandler(async (req, res) => {
  * GET /api/news/latest
  * ===========================================
  * 
- * Admin panel iÃ§in son haberler (veritabanÄ±ndan)
+ * Admin panel için son haberler (veritabanından)
  * 
  * Query parametreleri:
- * - limit: KaÃ§ haber (varsayÄ±lan: 20)
+ * - limit: Kaç haber (varsayılan: 20)
  * - category: Kategori filtresi
- * - keyword: BaÅŸlÄ±k aramasÄ±
+ * - keyword: Başlık araması
  */
 router.get('/latest', asyncHandler(async (req, res) => {
     const { limit = 20, category, keyword } = req.query;
@@ -627,19 +971,113 @@ router.get('/latest', asyncHandler(async (req, res) => {
 
 /**
  * ===========================================
+ * GET /api/news/health
+ * ===========================================
+ * 
+ * Sistem sağlık kontrolü endpoint'i
+ * API, veritabanı, cache ve cron job durumlarını döndürür
+ * 
+ * ÖNEMLİ: Bu route, /:id route'undan ÖNCE tanımlanmalı!
+ */
+router.get('/health', asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+    
+    // Veritabanı kontrolü
+    let dbStatus = 'unknown';
+    let newsCount = 0;
+    try {
+        newsCount = await News.countDocuments({ isActive: true });
+        dbStatus = 'connected';
+    } catch (err) {
+        dbStatus = 'error: ' + err.message;
+    }
+    
+    // Cache istatistikleri
+    const cacheStats = {
+        search: searchCache.getStats(),
+        newsList: newsListCache.getStats()
+    };
+    
+    // Cron job durumu
+    const { cronManager } = require('../jobs');
+    const cronStats = cronManager.getStats();
+    
+    const responseTime = Date.now() - startTime;
+    
+    res.json({
+        success: true,
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        responseTime: `${responseTime}ms`,
+        database: {
+            status: dbStatus,
+            activeNews: newsCount
+        },
+        cache: cacheStats,
+        cronJobs: cronStats,
+        memory: {
+            heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+        }
+    });
+}));
+
+/**
+ * ===========================================
+ * GET /api/news/cache/stats
+ * ===========================================
+ * 
+ * Cache istatistiklerini döndür
+ */
+router.get('/cache/stats', asyncHandler(async (req, res) => {
+    res.json({
+        success: true,
+        stats: {
+            search: searchCache.getStats(),
+            newsList: newsListCache.getStats()
+        }
+    });
+}));
+
+/**
+ * ===========================================
+ * DELETE /api/news/cache/clear
+ * ===========================================
+ * 
+ * Cache'i temizle (API key gerektirir)
+ */
+router.delete('/cache/clear', apiKey, asyncHandler(async (req, res) => {
+    const { type } = req.query;
+    
+    if (type === 'search') {
+        searchCache.clear();
+        return res.json({ success: true, message: 'Search cache temizlendi' });
+    } else if (type === 'list') {
+        newsListCache.clear();
+        return res.json({ success: true, message: 'News list cache temizlendi' });
+    } else {
+        searchCache.clear();
+        newsListCache.clear();
+        return res.json({ success: true, message: 'Tüm cache temizlendi' });
+    }
+}));
+
+/**
+ * ===========================================
  * GET /api/news/:id
  * ===========================================
  * 
- * ID'ye gÃ¶re tek haber getir
+ * ID'ye göre tek haber getir
  * 
  * Route parametresi:
  * :id -> MongoDB ObjectId
  * 
- * Ã–rnek: GET /api/news/507f1f77bcf86cd799439011
+ * Örnek: GET /api/news/507f1f77bcf86cd799439011
  * 
- * Ã–NEMLÄ°: Bu route en sonda olmalÄ± Ã§Ã¼nkÃ¼ :id herhangi bir
+ * ÖNEMLİ: Bu route en sonda olmalı çünkü :id herhangi bir
  * string'i yakalar. /stats, /search gibi spesifik route'lar
- * bundan Ã–NCE tanÄ±mlanmalÄ±!
+ * bundan ÖNCE tanımlanmalı!
  */
 router.get('/:id', asyncHandler(async (req, res) => {
     /**
@@ -651,9 +1089,9 @@ router.get('/:id', asyncHandler(async (req, res) => {
     // findById: MongoDB ObjectId ile arama
     const news = await News.findById(id);
     
-    // Haber bulunamadÄ±ysa 404 dÃ¶ndÃ¼r
+    // Haber bulunamadıysa 404 döndür
     if (!news) {
-        const error = new Error('Haber bulunamadÄ±');
+        const error = new Error('Haber bulunamadı');
         error.status = 404;
         throw error;
     }
@@ -684,21 +1122,6 @@ router.post('/scrape', apiKey, asyncHandler(async (req, res) => {
     res.json({ success: true, message: 'Scraping tamamlandi', data: result });
 }));
 
-// Protect manual scraping endpoint with API key
-router.post('/scrape', apiKey, asyncHandler(async (req, res) => {
-    const { source, keyword } = req.body;
-    let result;
-    if (keyword) {
-        result = await scraperService.scrapeWithKeyword(keyword);
-    } else if (source) {
-        result = await scraperService.scrapeSource(source);
-    } else {
-        result = await scraperService.scrapeAll();
-    }
-
-    res.json({ success: true, message: 'Scraping tamamlandi', data: result });
-}));
-
 /**
  * ===========================================
  * DELETE /api/news/cleanup
@@ -707,8 +1130,8 @@ router.post('/scrape', apiKey, asyncHandler(async (req, res) => {
  * Eski haberleri temizle
  * 
  * Query parametreleri:
- * - days: KaÃ§ gÃ¼nden eski (varsayÄ±lan: 30)
- * - hardDelete: GerÃ§ekten sil (varsayÄ±lan: false, sadece deaktive et)
+ * - days: Kaç günden eski (varsayılan: 30)
+ * - hardDelete: Gerçekten sil (varsayılan: false, sadece deaktive et)
  */
 router.delete('/cleanup', apiKey, asyncHandler(async (req, res) => {
     const { days = 30, hardDelete = false } = req.query;
@@ -722,225 +1145,6 @@ router.delete('/cleanup', apiKey, asyncHandler(async (req, res) => {
         success: true,
         message: `${count} haber ${hardDelete === 'true' ? 'silindi' : 'deaktive edildi'}`,
         count
-    });
-}));
-
-/**
- * ===========================================
- * GET /api/news/dashboard
- * ===========================================
- * 
- * Dashboard iÃ§in istatistikler
- */
-router.get('/dashboard', asyncHandler(async (req, res) => {
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-    const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
-    const [
-        totalNews,
-        todayNews,
-        weekNews,
-        byCategory,
-        bySource,
-        recentNews
-    ] = await Promise.all([
-        News.countDocuments({ isActive: true }),
-        News.countDocuments({ isActive: true, createdAt: { $gte: today } }),
-        News.countDocuments({ isActive: true, createdAt: { $gte: lastWeek } }),
-        News.aggregate([
-            { $match: { isActive: true } },
-            { $group: { _id: '$category', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 10 }
-        ]),
-        News.aggregate([
-            { $match: { isActive: true } },
-            { $group: { _id: '$source', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 15 }
-        ]),
-        News.find({ isActive: true })
-            .sort({ publishedAt: -1 })
-            .limit(5)
-            .select('title category source publishedAt')
-            .lean()
-    ]);
-    
-    // Son 7 gÃ¼nlÃ¼k haber sayÄ±sÄ± grafiÄŸi iÃ§in
-    const dailyStats = await News.aggregate([
-        {
-            $match: {
-                isActive: true,
-                createdAt: { $gte: lastWeek }
-            }
-        },
-        {
-            $group: {
-                _id: {
-                    $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
-                },
-                count: { $sum: 1 }
-            }
-        },
-        { $sort: { _id: 1 } }
-    ]);
-    
-    res.json({
-        success: true,
-        data: {
-            summary: {
-                total: totalNews,
-                today: todayNews,
-                week: weekNews,
-                avgPerDay: Math.round(weekNews / 7)
-            },
-            byCategory: byCategory.map(c => ({ category: c._id, count: c.count })),
-            bySource: bySource.map(s => ({ source: s._id, count: s.count })),
-            dailyStats: dailyStats.map(d => ({ date: d._id, count: d.count })),
-            recentNews
-        }
-    });
-}));
-
-/**
- * ===========================================
- * GET /api/news/compare
- * ===========================================
- * 
- * Haber karÅŸÄ±laÅŸtÄ±rma - aynÄ± olayÄ±n farklÄ± kaynaklardan haberleri
- */
-router.get('/compare', asyncHandler(async (req, res) => {
-    const { keyword, hours = 24 } = req.query;
-    
-    if (!keyword) {
-        return res.status(400).json({
-            success: false,
-            message: 'KarÅŸÄ±laÅŸtÄ±rma iÃ§in anahtar kelime gerekli'
-        });
-    }
-    
-    const since = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000);
-    
-    const news = await News.find({
-        isActive: true,
-        publishedAt: { $gte: since },
-        $or: [
-            { title: { $regex: keyword, $options: 'i' } },
-            { summary: { $regex: keyword, $options: 'i' } }
-        ]
-    })
-    .sort({ publishedAt: -1 })
-    .limit(50)
-    .lean();
-    
-    // Kaynaklara gÃ¶re grupla
-    const bySource = {};
-    for (const item of news) {
-        const source = item.source || 'Bilinmeyen';
-        if (!bySource[source]) {
-            bySource[source] = [];
-        }
-        bySource[source].push(item);
-    }
-    
-    // Duygu analizi ekle
-    const analyzedNews = sentimentService.analyzeBatch(news);
-    
-    res.json({
-        success: true,
-        data: {
-            keyword,
-            timeRange: `Son ${hours} saat`,
-            totalNews: news.length,
-            sourceCount: Object.keys(bySource).length,
-            bySource,
-            sentimentSummary: {
-                positive: analyzedNews.filter(n => n.sentiment.sentiment === 'positive').length,
-                negative: analyzedNews.filter(n => n.sentiment.sentiment === 'negative').length,
-                neutral: analyzedNews.filter(n => n.sentiment.sentiment === 'neutral').length
-            }
-        }
-    });
-}));
-
-/**
- * ===========================================
- * GET /api/news/advanced-search
- * ===========================================
- * 
- * GeliÅŸmiÅŸ filtrelerle arama
- */
-router.get('/advanced-search', asyncHandler(async (req, res) => {
-    const {
-        keyword,
-        categories,      // virgÃ¼lle ayrÄ±lmÄ±ÅŸ: "Ekonomi,Spor"
-        sources,         // virgÃ¼lle ayrÄ±lmÄ±ÅŸ: "NTV,CNN Turk"
-        startDate,
-        endDate,
-        sentiment,       // positive, negative, neutral
-        page = 1,
-        limit = 20
-    } = req.query;
-    
-    const query = { isActive: true };
-    
-    // Anahtar kelime
-    if (keyword) {
-        query.$or = [
-            { title: { $regex: keyword, $options: 'i' } },
-            { summary: { $regex: keyword, $options: 'i' } }
-        ];
-    }
-    
-    // Ã‡oklu kategori
-    if (categories) {
-        const catArray = categories.split(',').map(c => c.trim());
-        query.category = { $in: catArray.map(c => new RegExp(c, 'i')) };
-    }
-    
-    // Ã‡oklu kaynak
-    if (sources) {
-        const srcArray = sources.split(',').map(s => s.trim());
-        query.source = { $in: srcArray.map(s => new RegExp(s, 'i')) };
-    }
-    
-    // Tarih aralÄ±ÄŸÄ±
-    if (startDate || endDate) {
-        query.publishedAt = {};
-        if (startDate) query.publishedAt.$gte = new Date(startDate);
-        if (endDate) query.publishedAt.$lte = new Date(endDate);
-    }
-    
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const [news, total] = await Promise.all([
-        News.find(query)
-            .sort({ publishedAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit))
-            .lean(),
-        News.countDocuments(query)
-    ]);
-    
-    // Duygu analizi ve filtreleme
-    let result = sentimentService.analyzeBatch(news);
-    
-    if (sentiment) {
-        result = result.filter(n => n.sentiment.sentiment === sentiment);
-    }
-    
-    res.json({
-        success: true,
-        data: {
-            news: result,
-            pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
-                total,
-                totalPages: Math.ceil(total / parseInt(limit))
-            }
-        }
     });
 }));
 

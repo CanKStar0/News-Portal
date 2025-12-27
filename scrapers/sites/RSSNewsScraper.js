@@ -98,24 +98,117 @@ class RSSNewsScraper {
             'euro': ['eur', 'avro', 'euronun'],
             'enflasyon': ['tufe', 'tuik'],
             'faiz': ['politika faizi', 'tcmb faizi'],
-            'borsa': ['bist', 'bist100', 'borsa istanbul'],
-            'altin': ['ons', 'gram altin', 'ceyrek altin'],
-            'merkez bankasi': ['tcmb', 'mb'],
-            'kripto': ['bitcoin', 'btc', 'ethereum', 'eth'],
-            'petrol': ['brent', 'varil'],
-            'fenerbahce': ['fener', 'fb', 'sari lacivert'],
-            'galatasaray': ['gs', 'cimbom', 'sari kirmizi'],
-            'besiktas': ['bjk', 'kartal'],
-            'trabzonspor': ['ts', 'bordo mavi'],
-            'yapay zeka': ['ai', 'chatgpt', 'gpt']
+        };
+        
+        // Kategori belirleme için anahtar kelimeler
+        this.categoryKeywords = {
+            'Ekonomi': ['dolar', 'euro', 'borsa', 'hisse', 'faiz', 'enflasyon', 'tcmb', 'merkez bankası', 'kur', 'altın', 'bitcoin', 'kripto', 'bist', 'ekonomi', 'finans', 'yatırım', 'piyasa', 'ihracat', 'ithalat', 'büyüme', 'gsyh', 'işsizlik', 'bütçe', 'vergi', 'fiyat'],
+            'Spor': ['galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'süper lig', 'maç', 'gol', 'futbol', 'basketbol', 'voleybol', 'şampiyonlar ligi', 'uefa', 'fifa', 'milli takım', 'transfer', 'teknik direktör', 'spor', 'stadyum', 'derbi'],
+            'Teknoloji': ['iphone', 'android', 'samsung', 'apple', 'google', 'yapay zeka', 'ai', 'robot', 'yazılım', 'uygulama', 'sosyal medya', 'twitter', 'instagram', 'facebook', 'teknoloji', 'bilgisayar', 'telefon', 'internet', '5g', 'siber'],
+            'Sağlık': ['sağlık', 'hastane', 'doktor', 'ilaç', 'tedavi', 'hastalık', 'covid', 'grip', 'aşı', 'kanser', 'ameliyat', 'tıp', 'hasta'],
+            'Magazin': ['ünlü', 'oyuncu', 'şarkıcı', 'dizi', 'film', 'konser', 'düğün', 'boşanma', 'magazin', 'yıldız', 'sanatçı', 'moda', 'güzellik'],
+            'Dünya': ['abd', 'amerika', 'rusya', 'çin', 'avrupa', 'almanya', 'fransa', 'ingiltere', 'savaş', 'nato', 'bm', 'birleşmiş milletler', 'uluslararası', 'dünya', 'yurtdışı'],
+            'Gündem': ['tbmm', 'meclis', 'bakan', 'cumhurbaşkanı', 'erdoğan', 'hükümet', 'muhalefet', 'seçim', 'oy', 'parti', 'siyaset', 'yasa', 'kanun'],
+            'Son Dakika': ['son dakika', 'flaş', 'acil', 'breaking']
         };
 
         this.spamKeywords = ['casino', 'bahis', 'kumar', 'sex', 'porno', 'xxx'];
+        
+        // Footer ve geçersiz içerik tespiti için kalıplar
+        this.invalidPatterns = [
+            // Footer/Copyright metinleri
+            'tüm hakları saklıdır',
+            'all rights reserved',
+            'copyright',
+            '© 20',
+            'gizlilik politikası',
+            'kullanım koşulları',
+            'çerez politikası',
+            'kvkk',
+            'kişisel verilerin korunması',
+            'iletişim formu',
+            'bize ulaşın',
+            'reklam ver',
+            'künye',
+            'hakkımızda',
+            'site haritası',
+            'abone ol',
+            'bülten',
+            'newsletter',
+            'üye girişi',
+            'kayıt ol',
+            'şifremi unuttum',
+            // Menü/Navigasyon
+            'ana sayfa',
+            'anasayfa',
+            'kategoriler',
+            'etiketler',
+            'arşiv',
+            'son haberler',
+            'popüler haberler',
+            'en çok okunanlar',
+            // Reklam/Promosyon
+            'reklam alanı',
+            'sponsorlu içerik',
+            'advertorial',
+            // Sosyal medya
+            'bizi takip edin',
+            'sosyal medya',
+            'facebook\'ta paylaş',
+            'twitter\'da paylaş',
+            // Boş/Anlamsız içerik
+            'devamını oku',
+            'daha fazla',
+            'tıklayın',
+            'click here',
+            'read more'
+        ];
     }
 
     normalizeText(text) {
         if (!text) return '';
         return text.toLowerCase().trim();
+    }
+
+    /**
+     * Haber içeriğine göre otomatik kategori belirle
+     * 
+     * @param {string} title - Haber başlığı
+     * @param {string} description - Haber özeti
+     * @returns {string} - Belirlenen kategori
+     */
+    detectCategory(title, description) {
+        const text = this.normalizeText(title + ' ' + description);
+        const scores = {};
+        
+        // Her kategori için puan hesapla
+        for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
+            scores[category] = 0;
+            for (const keyword of keywords) {
+                if (text.includes(keyword.toLowerCase())) {
+                    // Başlıkta geçerse 3 puan, açıklamada geçerse 1 puan
+                    if (this.normalizeText(title).includes(keyword.toLowerCase())) {
+                        scores[category] += 3;
+                    } else {
+                        scores[category] += 1;
+                    }
+                }
+            }
+        }
+        
+        // En yüksek puanlı kategoriyi bul
+        let maxScore = 0;
+        let bestCategory = 'Genel';
+        
+        for (const [category, score] of Object.entries(scores)) {
+            if (score > maxScore) {
+                maxScore = score;
+                bestCategory = category;
+            }
+        }
+        
+        // Minimum 2 puan olmalı, yoksa Genel
+        return maxScore >= 2 ? bestCategory : 'Genel';
     }
 
     getSynonyms(keyword) {
@@ -176,11 +269,40 @@ class RSSNewsScraper {
         const content = this.normalizeText(item.contentSnippet || item.content || '');
         const combined = title + ' ' + content;
         
+        // Spam kontrolü
         for (const spam of this.spamKeywords) {
             if (combined.includes(spam)) return false;
         }
         
+        // Başlık çok kısa
         if (title.length < 15) return false;
+        
+        // Başlık çok uzun (muhtemelen birden fazla haber birleşmiş)
+        if (title.length > 300) return false;
+        
+        // Footer/geçersiz içerik kontrolü
+        for (const pattern of this.invalidPatterns) {
+            // Başlıkta footer metni varsa kesinlikle reddet
+            if (title.includes(pattern)) return false;
+            
+            // İçeriğin BÜYÜK kısmı footer metni ise reddet
+            // (küçük bir kısmı olabilir, sorun değil)
+        }
+        
+        // Sadece link içeren içerik
+        if (title.startsWith('http') || title.startsWith('www.')) return false;
+        
+        // Tarih formatı başlık (örn: "27 Aralık 2025")
+        const dateOnlyRegex = /^\d{1,2}\s+(ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)\s+\d{4}$/i;
+        if (dateOnlyRegex.test(title)) return false;
+        
+        // Sadece kaynak adı
+        const sourceOnlyPatterns = ['ntv', 'cnn türk', 'hürriyet', 'sözcü', 'sabah', 'habertürk'];
+        if (sourceOnlyPatterns.some(s => title === s)) return false;
+        
+        // Çok fazla özel karakter (muhtemelen bozuk encoding)
+        const specialCharCount = (title.match(/[^\w\sğüşıöçĞÜŞİÖÇ.,!?:;'"()-]/g) || []).length;
+        if (specialCharCount > title.length * 0.3) return false;
         
         return true;
     }
@@ -215,56 +337,17 @@ class RSSNewsScraper {
     }
 
     /**
-     * Try to fetch the article page and extract og:image / twitter:image as fallback.
-     * This is used when feed doesn't provide a unique image.
-     * Google News URL'leri redirect olduğu için maxRedirects ayarı var.
+     * fetchArticleImage - DEVRE DIŞI BIRAKILDI
+     * 
+     * Google News için makale sayfasından görsel çekme işlemi
+     * performans sorunlarına neden oluyordu (her haber için 3-8 saniye).
+     * Artık sadece RSS'den gelen görseli veya placeholder kullanıyoruz.
+     * 
+     * @deprecated Performans nedeniyle devre dışı
      */
     async fetchArticleImage(url) {
-        if (!url) return null;
-        try {
-            const res = await axios.get(url, { 
-                timeout: 8000, 
-                maxRedirects: 5,  // Google News redirect'lerini takip et
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
-                } 
-            });
-            const html = res.data;
-            const $ = cheerio.load(html);
-
-            // Open Graph - en güvenilir kaynak
-            const og = $('meta[property="og:image"]').attr('content') || $('meta[name="og:image"]').attr('content');
-            if (og && og.startsWith('http')) return og;
-
-            // Twitter Card
-            const tw = $('meta[name="twitter:image"]').attr('content') || $('meta[property="twitter:image"]').attr('content');
-            if (tw && tw.startsWith('http')) return tw;
-
-            // Link rel image_src
-            const linkImg = $('link[rel="image_src"]').attr('href');
-            if (linkImg && linkImg.startsWith('http')) return linkImg;
-
-            // Schema.org image
-            const schemaImg = $('meta[itemprop="image"]').attr('content');
-            if (schemaImg && schemaImg.startsWith('http')) return schemaImg;
-
-            // Fallback: article içindeki ilk büyük resim
-            const articleImg = $('article img[src^="http"]').first().attr('src');
-            if (articleImg) return articleImg;
-
-            // Son çare: sayfadaki herhangi bir resim
-            const anyImg = $('img[src^="http"]').filter((i, el) => {
-                const src = $(el).attr('src') || '';
-                // Küçük ikonları ve tracking piksellerini atla
-                return !src.includes('icon') && !src.includes('logo') && !src.includes('avatar') && !src.includes('1x1');
-            }).first().attr('src');
-            if (anyImg) return anyImg;
-
-        } catch (err) {
-            // Google News bazen 403 verebilir, sessizce devam et
-        }
+        // DEVRE DIŞI - Performans için kaldırıldı
+        // Placeholder görseller frontend'de kullanılıyor
         return null;
     }
 
@@ -293,32 +376,21 @@ class RSSNewsScraper {
                     // Google News RSS'den gelen URL (redirect URL olabilir)
                     const articleUrl = item.link;
                     
-                    // Google News RSS genelde görsel vermez, HER ZAMAN makale sayfasından çek
-                    let imageUrl = null;
-                    if (articleUrl) {
-                        try {
-                            imageUrl = await this.fetchArticleImage(articleUrl);
-                            if (imageUrl) {
-                                console.log(`  📷 Görsel bulundu: ${source}`);
-                            }
-                        } catch (imgErr) {
-                            // Görsel çekme başarısız olursa sessizce devam et
-                        }
-                    }
+                    // RSS'den gelen görsel (varsa kullan, yoksa null - frontend placeholder gösterecek)
+                    const imageUrl = this.extractImageUrl(item);
                     
-                    // Fallback: RSS'den gelen görsel (genelde yok)
-                    if (!imageUrl) {
-                        imageUrl = this.extractImageUrl(item);
-                    }
+                    // Haberin içeriğine göre otomatik kategori belirle
+                    const cleanTitle = titleParts.slice(0, -1).join(' - ').trim() || title;
+                    const detectedCategory = this.detectCategory(cleanTitle, description);
                     
                     results.push({
-                        title: titleParts.slice(0, -1).join(' - ').trim() || title,
+                        title: cleanTitle,
                         description: description.substring(0, 500).trim(),
                         url: articleUrl,
                         imageUrl: imageUrl,
                         publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
                         source: source,
-                        category: 'Google News',
+                        category: detectedCategory,  // Otomatik kategori
                         feedKey: 'google_news'
                     });
                 }

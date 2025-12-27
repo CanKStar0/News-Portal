@@ -16,10 +16,13 @@
         .subtitle { color: #a0a0a0; font-size: 0.95rem; font-weight: 300; }
         .search-container { max-width: 800px; margin: 30px auto; padding: 0 20px; }
         .search-box { position: relative; display: flex; align-items: center; }
-        .search-box input { width: 100%; padding: 16px 140px 16px 25px; font-size: 1rem; border: 2px solid rgba(255,255,255,0.1); border-radius: 50px; background: rgba(255,255,255,0.08); color: #fff; outline: none; transition: all 0.3s ease; }
+        .search-box input { width: 100%; padding: 16px 190px 16px 25px; font-size: 1rem; border: 2px solid rgba(255,255,255,0.1); border-radius: 50px; background: rgba(255,255,255,0.08); color: #fff; outline: none; transition: all 0.3s ease; }
         .search-box input::placeholder { color: #888; }
         .search-box input:focus { border-color: #00d9ff; background: rgba(255,255,255,0.12); box-shadow: 0 0 30px rgba(0,217,255,0.2); }
-        .search-btn { position: absolute; right: 8px; padding: 12px 25px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 50px; color: #1a1a2e; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .search-buttons { position: absolute; right: 8px; display: flex; gap: 6px; }
+        .search-btn { padding: 12px 25px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 50px; color: #1a1a2e; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .refresh-btn { padding: 12px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 50px; color: #00d9ff; font-size: 0.95rem; cursor: pointer; transition: all 0.3s ease; }
+        .refresh-btn:hover { background: rgba(0,217,255,0.2); border-color: #00d9ff; transform: rotate(180deg); }
         .search-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(0,217,255,0.4); }
         .search-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
         .search-hint { text-align: center; margin-top: 12px; font-size: 0.8rem; color: #666; }
@@ -81,7 +84,10 @@
     <div class="search-container">
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="Haber ara veya kategori sec...">
-            <button class="search-btn" id="searchBtn" onclick="searchNews()"><i class="fas fa-search"></i> Ara</button>
+            <div class="search-buttons">
+                <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Yenile"><i class="fas fa-sync-alt"></i></button>
+                <button class="search-btn" id="searchBtn" onclick="searchNews()"><i class="fas fa-search"></i> Ara</button>
+            </div>
         </div>
         <div class="search-hint">Populer: <span onclick="quickSearch('hava durumu')">Hava Durumu</span> <span onclick="quickSearch('dolar')">Dolar</span> <span onclick="quickSearch('altin')">Altin</span> <span onclick="quickSearch('galatasaray')">Galatasaray</span> <span onclick="quickSearch('bitcoin')">Bitcoin</span></div>
         <div class="deep-search-notice" id="deepSearchNotice"><i class="fas fa-sync fa-spin"></i>Veriler tekrar araniyor lutfen bekleyiniz...</div>
@@ -119,35 +125,63 @@
     <script>
         let currentPage = 1, allNews = [], filteredNews = [], currentCategory = '', currentSearch = '';
         const pageSize = 12;
-        document.addEventListener('DOMContentLoaded', () => { document.getElementById('searchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchNews(); }); });
+        
+        // Kategori cache'i - gecisler arasinda veriyi koru
+        const categoryCache = new Map();
+        
+        document.addEventListener('DOMContentLoaded', () => { 
+            document.getElementById('searchInput').addEventListener('keypress', (e) => { 
+                if (e.key === 'Enter') searchNews(); 
+            }); 
+        });
+        
         function quickSearch(keyword) { document.getElementById('searchInput').value = keyword; searchNews(); }
         
+        // Yenile butonu - mevcut aramayı veya kategoriyi tekrar yükle
+        async function refreshData() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
+            
+            try {
+                if (currentCategory) {
+                    // Kategori cache'ini temizle ve tekrar yükle
+                    categoryCache.delete(currentCategory);
+                    await loadCategory(currentCategory);
+                } else if (currentSearch) {
+                    await searchNews();
+                } else {
+                    alert('Önce bir arama yapın veya kategori seçin!');
+                }
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            }
+        }
+        
+        // Arama fonksiyonu - sadece veritabanını kullanır
         async function searchNews() {
             const keyword = document.getElementById('searchInput').value.trim();
-            if (!keyword) { alert('Lutfen bir arama terimi girin veya kategori secin!'); return; }
+            if (!keyword) { alert('Lutfen bir arama terimi girin!'); return; }
+            
             currentSearch = keyword; currentPage = 1; currentCategory = '';
             document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            
             const newsGrid = document.getElementById('newsGrid'), searchBtn = document.getElementById('searchBtn');
-            const deepSearchNotice = document.getElementById('deepSearchNotice');
             searchBtn.disabled = true; searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Araniyor...';
             newsGrid.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + keyword + ' icin araniyor...</p></div>';
-            deepSearchNotice.style.display = 'none';
-            // HEMEN searchMode'u guncelle - sonuc gelmeden once
+            
             document.getElementById('searchMode').style.display = 'block';
             document.getElementById('searchKeyword').textContent = '"' + keyword + '" araniyor...';
+            
             try {
                 const startTime = Date.now();
-                const response = await fetch('/api/news/live-search?keyword=' + encodeURIComponent(keyword));
+                // Sadece veritabanından ara - scrape yapmaz
+                const response = await fetch('/api/news/search?keyword=' + encodeURIComponent(keyword) + '&limit=50');
                 const data = await response.json();
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
                 
-                // Eger isScrapingMore true ise, deep search yapildi demektir
-                if (data.data && data.data.isScrapingMore) {
-                    deepSearchNotice.style.display = 'block';
-                    setTimeout(() => { deepSearchNotice.style.display = 'none'; }, 5000);
-                }
-                
-                if (data.success && data.data.news.length > 0) {
+                if (data.success && data.data.news && data.data.news.length > 0) {
                     allNews = data.data.news; filteredNews = allNews;
                     document.getElementById('totalNews').textContent = allNews.length + ' haber';
                     document.getElementById('searchTime').textContent = duration + ' sn';
@@ -159,23 +193,52 @@
                     document.getElementById('searchTime').textContent = duration + ' sn';
                     document.getElementById('searchKeyword').textContent = '"' + keyword + '" icin 0 sonuc';
                 }
-            } catch (error) { console.error('Arama hatasi:', error); showNoResults('Arama sirasinda bir hata olustu'); document.getElementById('searchKeyword').textContent = '"' + keyword + '" - Hata olustu'; }
-            finally { searchBtn.disabled = false; searchBtn.innerHTML = '<i class="fas fa-search"></i> Ara'; }
+            } catch (error) { 
+                console.error('Arama hatasi:', error); 
+                showNoResults('Arama sirasinda bir hata olustu'); 
+            } finally { 
+                searchBtn.disabled = false; 
+                searchBtn.innerHTML = '<i class="fas fa-search"></i> Ara'; 
+            }
         }
         
+        // Kategori yükleme - cache kullanır, sadece DB'den çeker
         async function loadCategory(category) {
             currentCategory = category; currentPage = 1; currentSearch = '';
             document.getElementById('searchInput').value = '';
-            document.querySelectorAll('.category-btn').forEach(btn => { btn.classList.remove('active'); if (btn.dataset.category === category) btn.classList.add('active'); });
+            document.querySelectorAll('.category-btn').forEach(btn => { 
+                btn.classList.remove('active'); 
+                if (btn.dataset.category === category) btn.classList.add('active'); 
+            });
+            
+            // Cache'de varsa hemen göster
+            if (categoryCache.has(category)) {
+                const cachedData = categoryCache.get(category);
+                allNews = cachedData.news; filteredNews = allNews;
+                document.getElementById('totalNews').textContent = allNews.length + ' haber';
+                document.getElementById('searchTime').textContent = 'cache';
+                document.getElementById('searchMode').style.display = 'block';
+                document.getElementById('searchKeyword').textContent = category + ' kategorisinde ' + allNews.length + ' haber';
+                renderNews();
+                return;
+            }
+            
             const newsGrid = document.getElementById('newsGrid');
             newsGrid.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + category + ' haberleri yukleniyor...</p></div>';
+            
             try {
                 const startTime = Date.now();
-                const response = await fetch('/api/news/live-category?category=' + encodeURIComponent(category));
+                // Sadece veritabanından çek - scrape yapmaz
+                const response = await fetch('/api/news/category/' + encodeURIComponent(category) + '?limit=50');
                 const data = await response.json();
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-                if (data.success && data.data.news.length > 0) {
-                    allNews = data.data.news; filteredNews = allNews;
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    allNews = data.data; filteredNews = allNews;
+                    
+                    // Cache'e kaydet
+                    categoryCache.set(category, { news: allNews, time: Date.now() });
+                    
                     document.getElementById('totalNews').textContent = allNews.length + ' haber';
                     document.getElementById('searchTime').textContent = duration + ' sn';
                     document.getElementById('searchMode').style.display = 'block';
@@ -186,10 +249,22 @@
                     document.getElementById('totalNews').textContent = '0';
                     document.getElementById('searchTime').textContent = duration + ' sn';
                 }
-            } catch (error) { console.error('Kategori hatasi:', error); showNoResults('Haberler yuklenirken hata olustu'); }
+            } catch (error) { 
+                console.error('Kategori hatasi:', error); 
+                showNoResults('Haberler yuklenirken hata olustu'); 
+            }
         }
         
-        function clearSearch() { currentSearch = ''; currentCategory = ''; allNews = []; filteredNews = []; document.getElementById('searchInput').value = ''; document.getElementById('searchMode').style.display = 'none'; document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active')); document.getElementById('newsGrid').innerHTML = '<div class="no-results"><i class="fas fa-search" style="color: #00d9ff;"></i><h3>Haber Aramaya Baslayin</h3><p>Arama yapin veya bir kategori secin</p></div>'; document.getElementById('pagination').style.display = 'none'; document.getElementById('totalNews').textContent = '-'; document.getElementById('searchTime').textContent = '-'; }
+        function clearSearch() { 
+            currentSearch = ''; currentCategory = ''; allNews = []; filteredNews = []; 
+            document.getElementById('searchInput').value = ''; 
+            document.getElementById('searchMode').style.display = 'none'; 
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active')); 
+            document.getElementById('newsGrid').innerHTML = '<div class="no-results"><i class="fas fa-search" style="color: #00d9ff;"></i><h3>Haber Aramaya Baslayin</h3><p>Arama yapin veya bir kategori secin</p></div>'; 
+            document.getElementById('pagination').style.display = 'none'; 
+            document.getElementById('totalNews').textContent = '-'; 
+            document.getElementById('searchTime').textContent = '-'; 
+        }
         
         function renderNews() {
             const newsGrid = document.getElementById('newsGrid');
