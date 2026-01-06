@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gizlilik Politikası - Haber Portali</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; }
+        
+        .header { text-align: center; padding: 30px 20px; background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-size: 2.2rem; font-weight: 700; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; text-decoration: none; display: inline-block; }
+        .logo i { -webkit-text-fill-color: #00d9ff; margin-right: 10px; }
+        .subtitle { color: #a0a0a0; font-size: 0.95rem; font-weight: 300; }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        
+        .page-title { text-align: center; margin-bottom: 40px; }
+        .page-title h1 { font-size: 2rem; color: #fff; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .page-title h1 i { color: #00d9ff; }
+        .page-title p { color: #888; font-size: 0.9rem; }
+        
+        .content-card { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 35px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .content-card h2 { color: #00d9ff; font-size: 1.2rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .content-card h2 i { font-size: 1rem; color: #00ff88; }
+        .content-card p { color: #ccc; line-height: 1.8; margin-bottom: 15px; font-size: 0.95rem; }
+        .content-card ul { color: #ccc; line-height: 1.8; margin-left: 20px; margin-bottom: 15px; }
+        .content-card li { margin-bottom: 8px; }
+        
+        .highlight-box { background: rgba(0,217,255,0.1); border-left: 4px solid #00d9ff; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .highlight-box p { color: #00d9ff; margin: 0; font-size: 0.9rem; }
+        
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 25px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 50px; color: #1a1a2e; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: all 0.3s; margin-bottom: 30px; }
+        .back-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(0,217,255,0.4); }
+        
+        .last-update { text-align: center; color: #666; font-size: 0.8rem; margin-top: 30px; }
+        
+        /* Footer */
+        .footer { background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.08); margin-top: 50px; padding: 40px 20px 25px; }
+        .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-bottom: 30px; }
+        .footer-section h3 { color: #00d9ff; font-size: 1rem; margin-bottom: 15px; font-weight: 600; }
+        .footer-section p { color: #888; font-size: 0.85rem; line-height: 1.6; }
+        .footer-links { list-style: none; }
+        .footer-links li { margin-bottom: 10px; }
+        .footer-links a { color: #888; text-decoration: none; font-size: 0.85rem; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .footer-links a:hover { color: #00d9ff; padding-left: 5px; }
+        .footer-links a i { font-size: 0.75rem; color: #00ff88; }
+        .footer-bottom { text-align: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); color: #555; font-size: 0.8rem; }
+        .footer-bottom a { color: #00d9ff; text-decoration: none; }
+        
+        @media (max-width: 768px) {
+            .header { padding: 20px 15px; }
+            .logo { font-size: 1.5rem; }
+            .container { padding: 25px 15px; }
+            .page-title h1 { font-size: 1.5rem; }
+            .content-card { padding: 25px 20px; }
+            .content-card h2 { font-size: 1.1rem; }
+            .content-card p, .content-card li { font-size: 0.9rem; }
+            .footer-content { grid-template-columns: 1fr; gap: 25px; text-align: center; }
+            .footer-links a { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo"><i class="fas fa-newspaper"></i>Haber Portali</a>
+        <p class="subtitle">Turkiye'nin En Kapsamli Haber Arama Motoru</p>
+    </header>
+    
+    <div class="container">
+        <a href="/" class="back-btn"><i class="fas fa-arrow-left"></i> Ana Sayfaya Don</a>
+        
+        <div class="page-title">
+            <h1><i class="fas fa-shield-alt"></i> Gizlilik Politikasi</h1>
+            <p>Kisisel verilerinizin korunmasi bizim icin onemlidir</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-info-circle"></i> Genel Bilgi</h2>
+            <p>Haber Portali olarak, kullanicilarimizin gizliligine saygı duyuyor ve kisisel verilerinin korunmasina buyuk onem veriyoruz. Bu gizlilik politikasi, web sitemizi kullanirken hangi bilgilerin toplandigini, nasil kullanildigini ve korunduğunu aciklamaktadir.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-database"></i> Toplanan Bilgiler</h2>
+            <p>Sitemizi ziyaret ettiginizde asagidaki bilgiler otomatik olarak toplanabilir:</p>
+            <ul>
+                <li><strong>IP Adresi:</strong> Guvenlik ve istatistik amaciyla</li>
+                <li><strong>Tarayici Bilgileri:</strong> Site deneyimini iyilestirmek icin</li>
+                <li><strong>Ziyaret Suresi:</strong> Icerik kalitesini artirmak icin</li>
+                <li><strong>Arama Terimleri:</strong> Arama sonuclarini iyilestirmek icin</li>
+            </ul>
+            <div class="highlight-box">
+                <p><i class="fas fa-lock"></i> Toplanan veriler ucuncu taraflarla paylasilmaz ve yalnizca hizmet kalitesini artirmak icin kullanilir.</p>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-cookie-bite"></i> Cerezler (Cookies)</h2>
+            <p>Sitemiz, kullanici deneyimini iyilestirmek icin cerezler kullanmaktadir:</p>
+            <ul>
+                <li><strong>Zorunlu Cerezler:</strong> Sitenin duzgun calismasi icin gerekli</li>
+                <li><strong>Analitik Cerezler:</strong> Ziyaretci istatistiklerini toplamak icin gerekli</li>
+                <li><strong>Reklam Cerezleri:</strong> Google AdSense reklamlari icin gerekli</li>
+            </ul>
+            <p>Tarayici ayarlarinizdan cerezleri devre disi birakabilirsiniz, ancak bu sitenin bazi ozelliklerinin calismamis olabilir.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-ad"></i> Google AdSense</h2>
+            <p>Sitemizde Google AdSense reklamlari gosterilmektedir. Google, reklamlari kisisellestirmek icin cerezler kullanabilir. Google'in veri kullanimi hakkinda daha fazla bilgi icin <a href="https://policies.google.com/privacy" target="_blank" style="color: #00d9ff;">Google Gizlilik Politikasi</a>'ni inceleyebilirsiniz.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-external-link-alt"></i> Ucuncu Taraf Baglantilari</h2>
+            <p>Sitemiz, cesitli haber kaynaklarina yonlendiren baglantilar icermektedir. Bu harici sitelerin gizlilik politikalarindan sorumlu degiliz. Harici sitelere gittiginizde, o sitelerin gizlilik politikalarini incelemenizi oneririz.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-user-shield"></i> Veri Guvenligi</h2>
+            <p>Kisisel verilerinizi korumak icin asagidaki onlemleri aliyoruz:</p>
+            <ul>
+                <li>SSL sertifikasi ile sifrelenmis baglanti</li>
+                <li>Guvenli sunucu altyapisi</li>
+                <li>Duzenli guvenlik guncellemeleri</li>
+                <li>Erisim kontrolu ve yetkilendirme</li>
+            </ul>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-child"></i> Cocuklarin Gizliligi</h2>
+            <p>Sitemiz 13 yasindan kucuk cocuklardan bilerek kisisel bilgi toplamaz. Eger bir cocugun bize kisisel bilgi sagladigini fark ederseniz, lutfen bizimle iletisime gecin.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-sync-alt"></i> Politika Guncellemeleri</h2>
+            <p>Bu gizlilik politikasi zaman zaman guncellenebilir. Onemli degisiklikler yapildiginda, sitemizde duyuru yapilacaktir. Politikayi duzenli olarak kontrol etmenizi oneririz.</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-envelope"></i> Iletisim</h2>
+            <p>Gizlilik politikamiz hakkinda sorulariniz varsa, bizimle iletisime gecebilirsiniz:</p>
+            <ul>
+                <li><strong>E-posta:</strong> info@haberportali.com</li>
+                <li><strong>Iletisim Sayfasi:</strong> <a href="/contact" style="color: #00d9ff;">Iletisim Formu</a></li>
+            </ul>
+        </div>
+        
+        <p class="last-update"><i class="fas fa-calendar-alt"></i> Son guncelleme: 6 Ocak 2026</p>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3><i class="fas fa-newspaper"></i> Haber Portali</h3>
+                <p>Turkiye'nin en kapsamli haber arama motoru. 100'den fazla guvenilir kaynaktan anlik haberler.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Hizli Erisim</h3>
+                <ul class="footer-links">
+                    <li><a href="/about"><i class="fas fa-chevron-right"></i> Hakkimizda</a></li>
+                    <li><a href="/privacy-policy"><i class="fas fa-chevron-right"></i> Gizlilik Politikasi</a></li>
+                    <li><a href="/contact"><i class="fas fa-chevron-right"></i> Iletisim</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Iletisim</h3>
+                <ul class="footer-links">
+                    <li><a href="mailto:info@haberportali.com"><i class="fas fa-envelope"></i> info@haberportali.com</a></li>
+                    <li><a href="/contact"><i class="fas fa-headset"></i> Destek</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Haber Portali. Tum haklari saklidir.</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -11,10 +11,12 @@
 
 const { connectDatabase, mongoose, isHealthy } = require('./database');
 const News = require('./News');
+const Visitor = require('./Visitor');
 
 module.exports = {
     connectDatabase,
     mongoose,
     isHealthy,
-    News
+    News,
+    Visitor
 };

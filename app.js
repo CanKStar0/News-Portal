@@ -53,7 +53,7 @@ const path = require('path');
 // Proje modülleri
 const config = require('./config');
 const { connectDatabase } = require('./models');
-const { newsRoutes } = require('./routes');
+const { newsRoutes, visitorRoutes } = require('./routes');
 const { notFoundHandler, errorHandler, rateLimiter, applySecurityMiddlewares } = require('./middleware');
 const { cronManager } = require('./jobs');
 
@@ -330,9 +330,37 @@ app.delete('/api/news/cache/clear', apiKeyMiddleware, (req, res) => {
 /**
  * GET /
  * 
- * Ana sayfa - API bilgileri
+ * Ana sayfa - index.html'i sun
  */
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+/**
+ * Statik HTML Sayfaları
+ * 
+ * /about -> about.html
+ * /privacy-policy -> privacy-policy.html
+ * /contact -> contact.html
+ */
+app.get('/about', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'about.html'));
+});
+
+app.get('/privacy-policy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
+});
+
+app.get('/contact', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'contact.html'));
+});
+
+/**
+ * GET /api
+ * 
+ * API bilgileri
+ */
+app.get('/api', (req, res) => {
     res.json({
         name: 'Haber Scraper API',
         version: '1.0.0',
@@ -377,6 +405,9 @@ app.use('/api/news/search', searchLimiter);
 app.use('/api/news/scrape', scrapeLimiter);
 
 app.use('/api/news', newsRoutes);
+
+// Ziyaretçi sayacı route'u
+app.use('/api/visitors', visitorRoutes);
 
 // ====================================
 // 6. HATA YAKALAMA MİDDLEWARE'LERİ

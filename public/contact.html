@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iletisim - Haber Portali</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; }
+        
+        .header { text-align: center; padding: 30px 20px; background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-size: 2.2rem; font-weight: 700; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; text-decoration: none; display: inline-block; }
+        .logo i { -webkit-text-fill-color: #00d9ff; margin-right: 10px; }
+        .subtitle { color: #a0a0a0; font-size: 0.95rem; font-weight: 300; }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        
+        .page-title { text-align: center; margin-bottom: 40px; }
+        .page-title h1 { font-size: 2rem; color: #fff; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .page-title h1 i { color: #00d9ff; }
+        .page-title p { color: #888; font-size: 0.9rem; }
+        
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 25px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 50px; color: #1a1a2e; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: all 0.3s; margin-bottom: 30px; }
+        .back-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(0,217,255,0.4); }
+        
+        /* Grid Layout */
+        .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        
+        /* Contact Info */
+        .contact-info { display: flex; flex-direction: column; gap: 20px; }
+        .info-card { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .info-card h3 { color: #00d9ff; font-size: 1rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .info-card h3 i { color: #00ff88; }
+        .info-card p { color: #ccc; line-height: 1.6; font-size: 0.9rem; }
+        
+        .contact-item { display: flex; align-items: center; gap: 15px; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .contact-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .contact-item i { width: 45px; height: 45px; background: rgba(0,217,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #00d9ff; font-size: 1.1rem; flex-shrink: 0; }
+        .contact-item-text h4 { color: #fff; font-size: 0.9rem; margin-bottom: 3px; }
+        .contact-item-text p { margin: 0; font-size: 0.85rem; }
+        .contact-item-text a { color: #00d9ff; text-decoration: none; transition: color 0.3s; }
+        .contact-item-text a:hover { color: #00ff88; }
+        
+        /* Contact Form */
+        .contact-form { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 35px; border: 1px solid rgba(255,255,255,0.08); }
+        .contact-form h2 { color: #fff; font-size: 1.3rem; margin-bottom: 25px; display: flex; align-items: center; gap: 12px; }
+        .contact-form h2 i { color: #00d9ff; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; color: #ccc; font-size: 0.85rem; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 14px 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-size: 0.95rem; font-family: 'Inter', sans-serif; transition: all 0.3s; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: #00d9ff; background: rgba(0,217,255,0.05); box-shadow: 0 0 0 3px rgba(0,217,255,0.1); }
+        .form-group input::placeholder, .form-group textarea::placeholder { color: #666; }
+        .form-group textarea { resize: vertical; min-height: 140px; }
+        .form-group select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; }
+        .form-group select option { background: #1a1a2e; color: #fff; }
+        
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .submit-btn { width: 100%; padding: 16px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 10px; color: #1a1a2e; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,217,255,0.4); }
+        .submit-btn:active { transform: translateY(0); }
+        
+        /* FAQ Section */
+        .faq-section { margin-top: 50px; }
+        .faq-section h2 { color: #fff; font-size: 1.5rem; text-align: center; margin-bottom: 30px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .faq-section h2 i { color: #00d9ff; }
+        
+        .faq-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .faq-item { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .faq-item h4 { color: #00d9ff; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; }
+        .faq-item h4 i { color: #00ff88; flex-shrink: 0; margin-top: 3px; }
+        .faq-item p { color: #888; font-size: 0.85rem; line-height: 1.6; }
+        
+        /* Success Message */
+        .success-message { display: none; background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center; }
+        .success-message.show { display: block; }
+        .success-message i { font-size: 2rem; color: #00ff88; margin-bottom: 10px; display: block; }
+        .success-message p { color: #00ff88; font-size: 0.95rem; margin: 0; }
+        
+        /* Footer */
+        .footer { background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.08); margin-top: 50px; padding: 40px 20px 25px; }
+        .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-bottom: 30px; }
+        .footer-section h3 { color: #00d9ff; font-size: 1rem; margin-bottom: 15px; font-weight: 600; }
+        .footer-section p { color: #888; font-size: 0.85rem; line-height: 1.6; }
+        .footer-links { list-style: none; }
+        .footer-links li { margin-bottom: 10px; }
+        .footer-links a { color: #888; text-decoration: none; font-size: 0.85rem; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .footer-links a:hover { color: #00d9ff; padding-left: 5px; }
+        .footer-links a i { font-size: 0.75rem; color: #00ff88; }
+        .footer-bottom { text-align: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); color: #555; font-size: 0.8rem; }
+        .footer-bottom a { color: #00d9ff; text-decoration: none; }
+        
+        @media (max-width: 768px) {
+            .header { padding: 20px 15px; }
+            .logo { font-size: 1.5rem; }
+            .container { padding: 25px 15px; }
+            .page-title h1 { font-size: 1.5rem; }
+            .contact-grid { grid-template-columns: 1fr; }
+            .contact-form { padding: 25px 20px; }
+            .form-row { grid-template-columns: 1fr; }
+            .faq-grid { grid-template-columns: 1fr; }
+            .footer-content { grid-template-columns: 1fr; gap: 25px; text-align: center; }
+            .footer-links a { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo"><i class="fas fa-newspaper"></i>Haber Portali</a>
+        <p class="subtitle">Turkiye'nin En Kapsamli Haber Arama Motoru</p>
+    </header>
+    
+    <div class="container">
+        <a href="/" class="back-btn"><i class="fas fa-arrow-left"></i> Ana Sayfaya Don</a>
+        
+        <div class="page-title">
+            <h1><i class="fas fa-headset"></i> Iletisim</h1>
+            <p>Sorulariniz icin bize ulasin, en kisa surede donelim</p>
+        </div>
+        
+        <div class="contact-grid">
+            <div class="contact-info">
+                <div class="info-card">
+                    <h3><i class="fas fa-map-marker-alt"></i> Iletisim Bilgileri</h3>
+                    <div class="contact-item">
+                        <i class="fas fa-envelope"></i>
+                        <div class="contact-item-text">
+                            <h4>E-posta</h4>
+                            <p><a href="mailto:info@haberportali.com">info@haberportali.com</a></p>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-clock"></i>
+                        <div class="contact-item-text">
+                            <h4>Calisma Saatleri</h4>
+                            <p>7/24 Online Destek</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> Hizli Bilgi</h3>
+                    <p>Sorularinizi genellikle 24 saat icinde yanitliyoruz. Acil durumlar icin e-posta konusuna "ACIL" yazmayi unutmayin.</p>
+                </div>
+            </div>
+            
+            <div class="contact-form">
+                <div class="success-message" id="successMessage">
+                    <i class="fas fa-check-circle"></i>
+                    <p>Mesajiniz basariyla gonderildi! En kisa surede size donecegiz.</p>
+                </div>
+                
+                <h2><i class="fas fa-paper-plane"></i> Mesaj Gonderin</h2>
+                <form id="contactForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="name">Adiniz Soyadiniz *</label>
+                            <input type="text" id="name" name="name" placeholder="Adinizi girin" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">E-posta Adresiniz *</label>
+                            <input type="email" id="email" name="email" placeholder="ornek@email.com" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Konu *</label>
+                        <select id="subject" name="subject" required>
+                            <option value="">Bir konu secin</option>
+                            <option value="genel">Genel Soru</option>
+                            <option value="teknik">Teknik Destek</option>
+                            <option value="oneri">Oneri / Geri Bildirim</option>
+                            <option value="hata">Hata Bildirimi</option>
+                            <option value="isbirligi">Is Birligi</option>
+                            <option value="diger">Diger</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Mesajiniz *</label>
+                        <textarea id="message" name="message" placeholder="Mesajinizi buraya yazin..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-paper-plane"></i> Mesaji Gonder
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="faq-section">
+            <h2><i class="fas fa-question-circle"></i> Sikca Sorulan Sorular</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h4><i class="fas fa-check-circle"></i> Haberler nereden aliniyor?</h4>
+                    <p>Haberlerimiz 100'den fazla guvenilir Turk haber kaynagindan otomatik olarak derlenmektedir.</p>
+                </div>
+                <div class="faq-item">
+                    <h4><i class="fas fa-check-circle"></i> Haberler ne siklikla guncelleniyor?</h4>
+                    <p>Sistemimiz her 30 dakikada bir tum kaynaklardan yeni haberleri otomatik olarak ekler.</p>
+                </div>
+                <div class="faq-item">
+                    <h4><i class="fas fa-check-circle"></i> Yanlis haber gorursem ne yapmaliyim?</h4>
+                    <p>Lutfen yukaridaki formu kullanarak "Hata Bildirimi" konusuyla bize bildirin. En kisa surede inceleyecegiz.</p>
+                </div>
+                <div class="faq-item">
+                    <h4><i class="fas fa-check-circle"></i> Site ucretsiz mi?</h4>
+                    <p>Evet, Haber Portali tamamen ucretsiz bir hizmettir. Reklam destekli olarak hizmet vermekteyiz.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3><i class="fas fa-newspaper"></i> Haber Portali</h3>
+                <p>Turkiye'nin en kapsamli haber arama motoru. 100'den fazla guvenilir kaynaktan anlik haberler.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Hizli Erisim</h3>
+                <ul class="footer-links">
+                    <li><a href="/about"><i class="fas fa-chevron-right"></i> Hakkimizda</a></li>
+                    <li><a href="/privacy-policy"><i class="fas fa-chevron-right"></i> Gizlilik Politikasi</a></li>
+                    <li><a href="/contact"><i class="fas fa-chevron-right"></i> Iletisim</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Iletisim</h3>
+                <ul class="footer-links">
+                    <li><a href="mailto:info@haberportali.com"><i class="fas fa-envelope"></i> info@haberportali.com</a></li>
+                    <li><a href="/contact"><i class="fas fa-headset"></i> Destek</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Haber Portali. Tum haklari saklidir.</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.getElementById('contactForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Simulate form submission
+            const btn = this.querySelector('.submit-btn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gonderiliyor...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                document.getElementById('successMessage').classList.add('show');
+                this.reset();
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Mesaji Gonder';
+                btn.disabled = false;
+                
+                // Hide success message after 5 seconds
+                setTimeout(() => {
+                    document.getElementById('successMessage').classList.remove('show');
+                }, 5000);
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

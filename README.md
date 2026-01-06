@@ -1,97 +1,191 @@
-# 📰 Haber Scraper - Web Kazıma Projesi
+# 📰 Haber Portali# 📰 Haber Scraper - Web Kazıma Projesi
 
-Node.js tabanlı haber scraping sistemi. Türkiye'deki 170'den fazla haber sitelerinden otomatik haber toplama, depolama ve API ile sunma.
 
-## 🎯 Proje Amacı
 
-Bu proje, kullanıcının seçtiği kategori (finans, teknoloji, spor vb.) ve anahtar kelime (bitcoin, dolar, enflasyon vb.) üzerinden haber sitelerini tarayarak haberleri toplayan bir sistemdir. API kullanmadan, tamamen web scraping yöntemiyle çalışır.
+Türkiye'nin en kapsamlı haber arama motoru. 100'den fazla güvenilir kaynaktan anlık haberler.Node.js tabanlı haber scraping sistemi. Türkiye'deki 170'den fazla haber sitelerinden otomatik haber toplama, depolama ve API ile sunma.
 
-## 🏗️ Mimari
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      HABER SCRAPER                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
+
+## 🎯 Proje Hakkında## 🎯 Proje Amacı
+
+
+
+Haber Portali, Türkiye'deki güncel haberleri tek bir platformda toplayan modern bir haber portalıdır. Kullanıcılar anahtar kelime veya kategori bazlı haber araması yapabilir, en son haberleri takip edebilir.Bu proje, kullanıcının seçtiği kategori (finans, teknoloji, spor vb.) ve anahtar kelime (bitcoin, dolar, enflasyon vb.) üzerinden haber sitelerini tarayarak haberleri toplayan bir sistemdir. API kullanmadan, tamamen web scraping yöntemiyle çalışır.
+
+
+
+## ✨ Özellikler## 🏗️ Mimari
+
+
+
+- 🔍 **Akıllı Arama** - Gelişmiş arama algoritması ile haberlere hızlı erişim```
+
+- 📂 **Kategori Filtreleme** - Gündem, Ekonomi, Spor, Teknoloji ve daha fazlası┌─────────────────────────────────────────────────────────────┐
+
+- ⚡ **Anlık Güncelleme** - Haberler düzenli aralıklarla güncellenir│                      HABER SCRAPER                          │
+
+- 📱 **Mobil Uyumlu** - Tüm cihazlarda mükemmel görünüm├─────────────────────────────────────────────────────────────┤
+
+- 🌙 **Modern Arayüz** - Göz yormayan koyu tema tasarımı│                                                             │
+
 │  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐  │
-│  │  SCRAPERS   │───▶│   SERVICE    │───▶│   MONGODB     │  │
+
+## 🖼️ Ekran Görüntüleri│  │  SCRAPERS   │───▶│   SERVICE    │───▶│   MONGODB     │  │
+
 │  │             │    │   (İş Mantığı)│    │  (Veritabanı) │  │
-│  │ Bloomberg   │    └──────────────┘    └───────────────┘  │
-│  │ Dünya       │           │                    ▲          │
+
+### Ana Sayfa│  │ Bloomberg   │    └──────────────┘    └───────────────┘  │
+
+Modern ve kullanıcı dostu arayüz ile haberlerinize kolayca ulaşın.│  │ Dünya       │           │                    ▲          │
+
 │  │ Foreks      │           │                    │          │
-│  └─────────────┘           ▼                    │          │
-│                    ┌──────────────┐              │          │
+
+### Kategori Görünümü│  └─────────────┘           ▼                    │          │
+
+İlgi alanınıza göre haberleri filtreleyin.│                    ┌──────────────┐              │          │
+
 │                    │ EXPRESS API  │──────────────┘          │
-│                    │  /api/news   │                         │
-│                    └──────────────┘                         │
+
+### Mobil Görünüm│                    │  /api/news   │                         │
+
+Her cihazda responsive tasarım.│                    └──────────────┘                         │
+
 │                           ▲                                 │
-│                           │                                 │
+
+## 🚀 Demo│                           │                                 │
+
 │                    ┌──────────────┐                         │
-│                    │  CRON JOBS   │                         │
+
+🌐 **Canlı Demo:** [haberportali.com](https://haberportali.com)│                    │  CRON JOBS   │                         │
+
 │                    │ (Zamanlayıcı)│                         │
-│                    └──────────────┘                         │
+
+## 📋 Sistem Gereksinimleri│                    └──────────────┘                         │
+
 │                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
 
-## 📁 Klasör Yapısı
+- Node.js 18+└─────────────────────────────────────────────────────────────┘
 
-```
-haber-scraper/
-├── config/                 # Uygulama ayarları
+- MongoDB 6+```
+
+
+
+## 🛠️ Kurulum## 📁 Klasör Yapısı
+
+
+
+```bash```
+
+# Bağımlılıkları yüklehaber-scraper/
+
+npm install├── config/                 # Uygulama ayarları
+
 │   └── index.js           # Merkezi konfigürasyon
-│
+
+# Ortam değişkenlerini ayarla (.env dosyasını düzenleyin)│
+
 ├── models/                 # Veritabanı modelleri
-│   ├── database.js        # MongoDB bağlantı yönetimi
-│   ├── News.js            # Haber şeması
-│   └── index.js           # Model exports
+
+# Uygulamayı başlat│   ├── database.js        # MongoDB bağlantı yönetimi
+
+npm start│   ├── News.js            # Haber şeması
+
+```│   └── index.js           # Model exports
+
 │
-├── scrapers/              # Web scraping modülleri
+
+## 📁 Proje Yapısı├── scrapers/              # Web scraping modülleri
+
 │   ├── base/
-│   │   └── BaseScraper.js # Temel scraper sınıfı
-│   ├── sites/
-│   │   ├── BloombergScraper.js
-│   │   ├── DunyaScraper.js
-│   │   └── ForeksScraper.js
-│   └── index.js
+
+```│   │   └── BaseScraper.js # Temel scraper sınıfı
+
+├── public/          # Frontend dosyaları│   ├── sites/
+
+├── routes/          # API rotaları│   │   ├── BloombergScraper.js
+
+├── models/          # Veritabanı modelleri│   │   ├── DunyaScraper.js
+
+├── services/        # İş mantığı│   │   └── ForeksScraper.js
+
+├── middleware/      # Express middleware'leri│   └── index.js
+
+├── jobs/            # Zamanlı görevler│
+
+├── config/          # Yapılandırma├── services/              # İş mantığı katmanı
+
+└── app.js           # Ana uygulama│   ├── ScraperService.js  # Scraping orkestrasyon
+
+```│   └── index.js
+
 │
-├── services/              # İş mantığı katmanı
-│   ├── ScraperService.js  # Scraping orkestrasyon
-│   └── index.js
-│
-├── routes/                # API endpoint'leri
+
+## 🔒 Güvenlik├── routes/                # API endpoint'leri
+
 │   ├── news.js            # Haber route'ları
+
+- Rate limiting ile DDoS koruması│   └── index.js
+
+- Input validation ve sanitization│
+
+- Helmet.js güvenlik başlıkları├── middleware/            # Express middleware'leri
+
+- CORS yapılandırması│   ├── errorHandler.js    # Hata yakalama
+
 │   └── index.js
-│
-├── middleware/            # Express middleware'leri
-│   ├── errorHandler.js    # Hata yakalama
-│   └── index.js
-│
+
+## 📄 Sayfalar│
+
 ├── jobs/                  # Zamanlı görevler
-│   ├── cronManager.js     # Cron job yönetimi
-│   └── index.js
+
+| Sayfa | Açıklama |│   ├── cronManager.js     # Cron job yönetimi
+
+|-------|----------|│   └── index.js
+
+| Ana Sayfa | Haber arama ve listeleme |│
+
+| Hakkımızda | Portal hakkında bilgi |├── utils/                 # Yardımcı fonksiyonlar
+
+| Gizlilik Politikası | KVKK ve gizlilik bilgileri |│   ├── helpers.js         # Genel yardımcılar
+
+| İletişim | İletişim formu |│   └── index.js
+
 │
-├── utils/                 # Yardımcı fonksiyonlar
-│   ├── helpers.js         # Genel yardımcılar
-│   └── index.js
-│
-├── scripts/               # Yardımcı scriptler
+
+## 📊 İstatistikler├── scripts/               # Yardımcı scriptler
+
 │   └── manual-scrape.js   # Manuel scraping
-│
-├── .env                   # Ortam değişkenleri
-├── .gitignore             # Git ignore listesi
+
+- 100+ Haber Kaynağı│
+
+- 10.000+ Günlük Haber├── .env                   # Ortam değişkenleri
+
+- 7/24 Aktif Hizmet├── .gitignore             # Git ignore listesi
+
 ├── package.json           # Proje bağımlılıkları
-├── app.js                 # Ana uygulama
+
+## 🤝 İletişim├── app.js                 # Ana uygulama
+
 └── README.md              # Bu dosya
-```
 
-## 🚀 Kurulum
+Sorularınız için: info@haberportali.com```
 
-### Gereksinimler
 
-- Node.js >= 18.0.0
+
+## 📝 Lisans## 🚀 Kurulum
+
+
+
+Bu proje özel lisanslıdır. Ticari kullanım için izin gereklidir.### Gereksinimler
+
+
+
+---- Node.js >= 18.0.0
+
 - MongoDB >= 6.0
-- npm veya yarn
+
+© 2025 Haber Portali. Tüm hakları saklıdır.- npm veya yarn
+
 
 ### Adımlar
 

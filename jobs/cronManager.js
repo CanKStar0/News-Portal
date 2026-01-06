@@ -134,37 +134,23 @@ class CronJobManager {
     /**
      * Temizlik Job
      * 
+     * ⚠️ DEVREDİŞİ BIRAKILDI - Haberler makine öğrenmesinde kullanılacak
+     * 
      * Eski haberleri temizler/deaktive eder.
      * Varsayılan: Her gün gece 03:00'da
      */
     createCleanupJob() {
-        // Her gün saat 03:00'da çalış
-        const cronExpression = '0 3 * * *';
+        // ⚠️ Haber silme/deaktive etme işlemi iptal edildi
+        // Kullanıcı haberleri makine öğrenmesinde kullanacak
+        console.log(`📌 Cleanup Job: DEVREDİŞİ (Haberler ML için saklanıyor)`);
         
-        console.log(`📌 Cleanup Job: Her gün 03:00'da`);
-        console.log(`   Cron: ${cronExpression}`);
-
-        const job = cron.schedule(cronExpression, async () => {
-            console.log('\n🧹 ZAMANLANMIŞ TEMİZLİK BAŞLIYOR\n');
-
-            try {
-                // 5 günden eski haberleri deaktive et (kullanıcı isteği)
-                const count = await scraperService.cleanupOldNews(5, false);
-                console.log(`✅ ${count} eski haber deaktive edildi`);
-
-            } catch (error) {
-                console.error('❌ Temizlik hatası:', error.message);
-            }
-        }, {
-            scheduled: true,
-            timezone: 'Europe/Istanbul'
-        });
-
+        // Job oluşturulmadı, sadece bilgi için kayıt
         this.jobs.set('cleanup', {
-            job,
+            job: null,
             name: 'Veritabanı Temizliği',
-            schedule: 'Her gün 03:00',
-            cronExpression
+            schedule: 'Devre dışı',
+            cronExpression: 'Devre dışı - Haberler saklanıyor',
+            disabled: true
         });
     }
 
@@ -245,8 +231,13 @@ class CronJobManager {
         console.log('\n⏹️ Tüm cron job\'lar durduruluyor...');
         
         for (const [name, info] of this.jobs) {
-            info.job.stop();
-            console.log(`   ⏹️ ${info.name} durduruldu`);
+            // Job null ise (devre dışı) atla
+            if (info.job) {
+                info.job.stop();
+                console.log(`   ⏹️ ${info.name} durduruldu`);
+            } else {
+                console.log(`   ⏸️ ${info.name} zaten devre dışı`);
+            }
         }
     }
 

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hakkimizda - Haber Portali</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; }
+        
+        .header { text-align: center; padding: 30px 20px; background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-size: 2.2rem; font-weight: 700; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; text-decoration: none; display: inline-block; }
+        .logo i { -webkit-text-fill-color: #00d9ff; margin-right: 10px; }
+        .subtitle { color: #a0a0a0; font-size: 0.95rem; font-weight: 300; }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        
+        .page-title { text-align: center; margin-bottom: 40px; }
+        .page-title h1 { font-size: 2rem; color: #fff; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .page-title h1 i { color: #00d9ff; }
+        .page-title p { color: #888; font-size: 0.9rem; }
+        
+        .content-card { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 35px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .content-card h2 { color: #00d9ff; font-size: 1.2rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .content-card h2 i { font-size: 1rem; color: #00ff88; }
+        .content-card p { color: #ccc; line-height: 1.8; margin-bottom: 15px; font-size: 0.95rem; }
+        .content-card ul { color: #ccc; line-height: 1.8; margin-left: 20px; margin-bottom: 15px; }
+        .content-card li { margin-bottom: 8px; }
+        
+        .highlight-box { background: rgba(0,217,255,0.1); border-left: 4px solid #00d9ff; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .highlight-box p { color: #00d9ff; margin: 0; font-size: 0.9rem; }
+        
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 25px; background: linear-gradient(90deg, #00d9ff, #00ff88); border: none; border-radius: 50px; color: #1a1a2e; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: all 0.3s; margin-bottom: 30px; }
+        .back-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(0,217,255,0.4); }
+        
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 30px 0; }
+        .stat-box { background: rgba(0,217,255,0.1); border-radius: 12px; padding: 25px 15px; text-align: center; border: 1px solid rgba(0,217,255,0.2); }
+        .stat-box i { font-size: 2rem; color: #00d9ff; margin-bottom: 10px; display: block; }
+        .stat-box .number { font-size: 1.8rem; font-weight: 700; color: #00ff88; display: block; }
+        .stat-box .label { font-size: 0.8rem; color: #888; margin-top: 5px; }
+        
+        /* Features */
+        .features-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .feature-item { display: flex; align-items: flex-start; gap: 15px; padding: 20px; background: rgba(255,255,255,0.03); border-radius: 12px; }
+        .feature-item i { font-size: 1.5rem; color: #00d9ff; flex-shrink: 0; margin-top: 3px; }
+        .feature-item h4 { color: #fff; font-size: 1rem; margin-bottom: 5px; }
+        .feature-item p { color: #888; font-size: 0.85rem; line-height: 1.5; margin: 0; }
+        
+        /* Footer */
+        .footer { background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.08); margin-top: 50px; padding: 40px 20px 25px; }
+        .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-bottom: 30px; }
+        .footer-section h3 { color: #00d9ff; font-size: 1rem; margin-bottom: 15px; font-weight: 600; }
+        .footer-section p { color: #888; font-size: 0.85rem; line-height: 1.6; }
+        .footer-links { list-style: none; }
+        .footer-links li { margin-bottom: 10px; }
+        .footer-links a { color: #888; text-decoration: none; font-size: 0.85rem; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .footer-links a:hover { color: #00d9ff; padding-left: 5px; }
+        .footer-links a i { font-size: 0.75rem; color: #00ff88; }
+        .footer-bottom { text-align: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); color: #555; font-size: 0.8rem; }
+        .footer-bottom a { color: #00d9ff; text-decoration: none; }
+        
+        @media (max-width: 768px) {
+            .header { padding: 20px 15px; }
+            .logo { font-size: 1.5rem; }
+            .container { padding: 25px 15px; }
+            .page-title h1 { font-size: 1.5rem; }
+            .content-card { padding: 25px 20px; }
+            .content-card h2 { font-size: 1.1rem; }
+            .content-card p, .content-card li { font-size: 0.9rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .stat-box { padding: 20px 10px; }
+            .stat-box .number { font-size: 1.5rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .footer-content { grid-template-columns: 1fr; gap: 25px; text-align: center; }
+            .footer-links a { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo"><i class="fas fa-newspaper"></i>Haber Portali</a>
+        <p class="subtitle">Turkiye'nin En Kapsamli Haber Arama Motoru</p>
+    </header>
+    
+    <div class="container">
+        <a href="/" class="back-btn"><i class="fas fa-arrow-left"></i> Ana Sayfaya Don</a>
+        
+        <div class="page-title">
+            <h1><i class="fas fa-building"></i> Hakkimizda</h1>
+            <p>Turkiye'nin en kapsamli haber arama motorunu kesfet</p>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-bullseye"></i> Misyonumuz</h2>
+            <p>Haber Portali, Turkiye'deki tum onemli haberleri tek bir platformda toplama vizyonuyla 2025 yilinda kuruldu. Amacimiz, kullanicilarin guvenilir haber kaynaklarindan gelen haberlere hizli ve kolay bir sekilde ulasmasini saglamaktir.</p>
+            <p>100'den fazla guvenilir Turk haber kaynagindan haberleri derleyerek, kullanicilarimiza en guncel haberleri sunuyoruz. Gelismis arama motorumuz sayesinde, aradaginiz habere saniyeler icinde ulasabilirsiniz.</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <i class="fas fa-newspaper"></i>
+                <span class="number">100+</span>
+                <span class="label">Haber Kaynagi</span>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-database"></i>
+                <span class="number">10K+</span>
+                <span class="label">Gunluk Haber</span>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-bolt"></i>
+                <span class="number">60ms</span>
+                <span class="label">Arama Suresi</span>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-users"></i>
+                <span class="number">7/24</span>
+                <span class="label">Aktif Hizmet</span>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-star"></i> Ozelliklerimiz</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <i class="fas fa-search"></i>
+                    <div>
+                        <h4>Akilli Arama</h4>
+                        <p>Gelismis arama algoritmamiz ile aradığınız haberi saniyeler icinde bulun.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-layer-group"></i>
+                    <div>
+                        <h4>Kategori Filtreleme</h4>
+                        <p>Gundem, Ekonomi, Spor, Teknoloji ve daha fazla kategoride haberler.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-sync-alt"></i>
+                    <div>
+                        <h4>Canli Guncelleme</h4>
+                        <p>Her 30 dakikada bir yeni haberler otomatik olarak eklenir.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-mobile-alt"></i>
+                    <div>
+                        <h4>Mobil Uyumlu</h4>
+                        <p>Tum cihazlarda mukemmel gorunum ve kullanim deneyimi.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-shield-alt"></i> Guvenilirlik</h2>
+            <p>Haber Portali olarak, yalnizca guvenilir ve taninmis haber kaynaklarindan icerik topluyoruz. Kaynaklarimiz arasinda:</p>
+            <ul>
+                <li>Ulusal haber ajanslari</li>
+                <li>Buyuk medya kuruluslari</li>
+                <li>Yerel haber siteleri</li>
+                <li>Ekonomi ve finans portallari</li>
+                <li>Spor haber siteleri</li>
+            </ul>
+            <div class="highlight-box">
+                <p><i class="fas fa-info-circle"></i> Haberler kaynaklardan oldugu gibi alinir ve icerikler uzerinde herhangi bir degisiklik yapilmaz.</p>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <h2><i class="fas fa-envelope"></i> Iletisim</h2>
+            <p>Sorulariniz, onerileriniz veya geri bildirimleriniz icin bizimle iletisime gecebilirsiniz:</p>
+            <ul>
+                <li><strong>E-posta:</strong> info@haberportali.com</li>
+                <li><strong>Iletisim Formu:</strong> <a href="/contact" style="color: #00d9ff;">Iletisim Sayfasi</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3><i class="fas fa-newspaper"></i> Haber Portali</h3>
+                <p>Turkiye'nin en kapsamli haber arama motoru. 100'den fazla guvenilir kaynaktan anlik haberler.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Hizli Erisim</h3>
+                <ul class="footer-links">
+                    <li><a href="/about"><i class="fas fa-chevron-right"></i> Hakkimizda</a></li>
+                    <li><a href="/privacy-policy"><i class="fas fa-chevron-right"></i> Gizlilik Politikasi</a></li>
+                    <li><a href="/contact"><i class="fas fa-chevron-right"></i> Iletisim</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Iletisim</h3>
+                <ul class="footer-links">
+                    <li><a href="mailto:info@haberportali.com"><i class="fas fa-envelope"></i> info@haberportali.com</a></li>
+                    <li><a href="/contact"><i class="fas fa-headset"></i> Destek</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Haber Portali. Tum haklari saklidir.</p>
+        </div>
+    </footer>
+</body>
+</html>

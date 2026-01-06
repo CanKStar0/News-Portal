@@ -8,7 +8,9 @@
  */
 
 const newsRoutes = require('./news');
+const visitorRoutes = require('./visitors');
 
 module.exports = {
-    newsRoutes
+    newsRoutes,
+    visitorRoutes
 };
